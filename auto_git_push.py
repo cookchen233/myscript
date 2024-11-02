@@ -40,7 +40,7 @@ class ConfigManager:
             "receiver_email": os.getenv("GIT_MAIL_TO"),
             "min_interval": 3600,
             "max_daily_emails": 3,
-            "enabled": os.getenv("GIT_MAIL_ENABLED", False),
+            "enabled": os.getenv("GIT_ENABLE_MAIL", False),
         }
         
         # 验证必要的环境变量
