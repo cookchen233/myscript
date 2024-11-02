@@ -1,0 +1,14 @@
+# 第一组同步
+SOURCE=/Users/Chen/Coding/chenhuisoft
+TARGET=/Users/Chen/Coding/mount-win/chenhuisoft
+
+# 第二组同步
+; SOURCE2=~/Documents/project1
+; TARGET2=~/Documents/project1-win
+
+# 忽略文件和目录
+IGNORE_LIST
+.git
+.idea
+.DS_Store
+node_modules

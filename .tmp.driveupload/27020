@@ -1,0 +1,9 @@
+
+curl 'https://api.ldtse.com/api/oa.config/myModel' \
+  -H 'channel: weapp' \
+  -H 'content-type: application/json' \
+  -H 'Referer: https://servicewechat.com/wxe17ffddcbe316019/0/page-frame.html' \
+  -H 'site-id: 8' \
+  -H 'User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 17_6_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.53(0x1800352c) NetType/WIFI Language/zh_CN' \
+  -H 'api-token: ' \
+  --compressed
