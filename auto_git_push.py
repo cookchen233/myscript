@@ -12,7 +12,11 @@ from dotenv import load_dotenv
 
 def get_env_file_hash():
     """获取.env文件的哈希值"""
-    env_path = Path('.env')
+    # 获取当前脚本所在的目录
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    # 构造.env文件的完整路径
+    env_path = Path(script_dir) / '.env'
+    
     if not env_path.exists():
         return None
     return hashlib.md5(env_path.read_bytes()).hexdigest()
@@ -247,13 +251,13 @@ def main():
                     else:
                         print(f"仓库 {repo_path} 推送失败: {message} - {datetime.now()}")
 
-            time.sleep(20)
+            time.sleep(5)
         except KeyboardInterrupt:
             print("程序已停止")
             break
         except Exception as e:
             print(f"发生错误: {str(e)}")
-            time.sleep(20)
+            time.sleep(5)
 
 if __name__ == "__main__":
     main()

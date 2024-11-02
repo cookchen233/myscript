@@ -80,11 +80,16 @@ class EnvFileHandler(FileSystemEventHandler):
         self.reload_interval = 1  # 最小重载间隔(秒)
 
     def on_modified(self, event):
-        if event.src_path.endswith('.env'):
-            current_time = time.time()
-            if current_time - self.last_reload >= self.reload_interval:
-                self.last_reload = current_time
-                self.server.reload_config()
+        try:
+            self.server.logger.info(f"File modified: {event.src_path}")
+            if event.src_path.endswith('.env'):
+                self.server.logger.info(".env file modified, reloading configuration...")
+                current_time = time.time()
+                if current_time - self.last_reload >= self.reload_interval:
+                    self.last_reload = current_time
+                    self.server.reload_config()
+        except Exception as e:
+            self.server.logger.error(f"Error in EnvFileHandler.on_modified: {e}", exc_info=True)
 
 class NotificationServer:
     def __init__(self):
@@ -133,16 +138,25 @@ class NotificationServer:
         
         # 添加env文件监控
         self.setup_env_monitor()
-        self.logger.info("xxx Discord event handlers...")
-
+        self.logger.info("Discord event handlers...")
 
     def setup_env_monitor(self):
         """设置.env文件监控"""
         self.env_observer = Observer()
         handler = EnvFileHandler(self)
         
-        # 获取.env文件所在目录
-        env_dir = os.path.dirname(os.path.abspath('.env'))
+        # 获取脚本所在目录
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        # 构造.env文件的完整路径
+        env_path = os.path.join(script_dir, '.env')
+        
+        # 检查文件是否存在
+        if not os.path.exists(env_path):
+            error_msg = f".env file not found at {env_path}"
+            self.logger.error(error_msg)
+            raise FileNotFoundError(error_msg)
+        
+        env_dir = os.path.dirname(env_path)
         self.env_observer.schedule(handler, env_dir, recursive=False)
         self.env_observer.start()
         self.logger.info("Started monitoring .env file for changes")
@@ -304,7 +318,7 @@ class NotificationServer:
         self.notification_history[history_key] = current_time
         return True
 
-    def play_sound(self, message, error_tag, error_level):
+    def play_sound(self, message, details, error_tag, error_level):
         """播放声音通知"""
         if not self.config['enable_sound']:
             return
@@ -332,7 +346,7 @@ class NotificationServer:
         except Exception as e:
             self.logger.error(f"Failed to play sound: {e}")
 
-    def send_mail(self, message, error_tag, error_level):
+    def send_mail(self, message, details, error_tag, error_level):
         """发送邮件通知"""
         if not self.config['enable_mail']:
             return
@@ -341,7 +355,27 @@ class NotificationServer:
             return
             
         try:
-            msg = MIMEText(message, 'plain', 'utf-8')
+            html_content = f"""
+            <html><head>
+            <style>
+                body {{
+                    font-family: 'Helvetica', sans-serif; /* 简洁现代 */
+                }}
+                h2{{
+                    font-size:14px;
+                    color: #333;
+                }}
+                pre {{
+                    font-size:12px;
+                }}
+            </style>
+            </head>
+            <body>
+            <h2>{message}</h2>
+            <p><pre>{details}</pre></p>
+            </body></html>
+            """
+            msg = MIMEText(html_content, 'html', 'utf-8')
             msg['Subject'] = Header(f'[{error_level.upper()}] 系统通知', 'utf-8')
             msg['From'] = self.config['mail_from']
             msg['To'] = ','.join(self.config['mail_to'])
@@ -349,11 +383,39 @@ class NotificationServer:
             with smtplib.SMTP_SSL(self.config['smtp_host'], self.config['smtp_port']) as smtp:
                 smtp.login(self.config['smtp_user'], self.config['smtp_pass'])
                 smtp.send_message(msg)
-                
+                    
             self.logger.debug(f"Mail sent for {error_level} message: {message}")
         except Exception as e:
             self.logger.error(f"Failed to send mail: {e}")
+            
+    async def send_discord(self, message, details, error_tag, error_level):
+            """发送Discord通知"""
+            if not self.config['enable_discord']:
+                return
                 
+            if not self.should_notify(error_tag, error_level, 'discord'):
+                return
+                
+            retries = 3
+            for attempt in range(retries):
+                try:
+                    if not self.discord_connected or not self.discord_channel:
+                        await self.discord_start()
+                    
+                    if self.discord_channel:
+                        await self.discord_channel.send(f"[{error_level.upper()}] \n {message} \n {details}")
+                        self.logger.debug(f"Discord message sent: {message}")
+                        return
+                        
+                except discord.errors.HTTPException as e:
+                    self.logger.warning(f"Discord HTTP error: {e}")
+                    await asyncio.sleep(1)
+                except Exception as e:
+                    self.logger.error(f"Discord error: {e}")
+                    self.discord_connected = False
+                    if attempt == retries - 1:
+                        raise
+        
     
     def setup_discord(self):
         """设置Discord客户端"""
@@ -443,8 +505,6 @@ class NotificationServer:
                 except Exception as e:
                     self.logger.error(f"Error in Discord heartbeat: {e}")
                     await asyncio.sleep(5)
-    
-
     
     async def discord_start(self):
         """异步启动Discord客户端"""
@@ -551,35 +611,7 @@ class NotificationServer:
                     await self.discord_client.close()
                 self.discord_client = None
                 raise
-                                     
-    async def send_discord(self, message, error_tag, error_level):
-        """发送Discord通知"""
-        if not self.config['enable_discord']:
-            return
-            
-        if not self.should_notify(error_tag, error_level, 'discord'):
-            return
-            
-        retries = 3
-        for attempt in range(retries):
-            try:
-                if not self.discord_connected or not self.discord_channel:
-                    await self.discord_start()
-                
-                if self.discord_channel:
-                    await self.discord_channel.send(f"[{error_level.upper()}] {message}")
-                    self.logger.debug(f"Discord message sent: {message}")
-                    return
-                    
-            except discord.errors.HTTPException as e:
-                self.logger.warning(f"Discord HTTP error: {e}")
-                await asyncio.sleep(1)
-            except Exception as e:
-                self.logger.error(f"Discord error: {e}")
-                self.discord_connected = False
-                if attempt == retries - 1:
-                    raise
-                   
+                                                    
     async def process_message(self, message):
         """处理接收到的消息"""
         try:
@@ -587,6 +619,7 @@ class NotificationServer:
             error_tag = str(data.get('error_tag', ''))
             error_level = data.get('error_level', 'info').lower()
             message = data.get('message', message)
+            details = data.get('details')
             
             if error_level not in [ErrorLevel.DEBUG, ErrorLevel.INFO, ErrorLevel.ERROR]:
                 error_level = ErrorLevel.INFO
@@ -595,12 +628,18 @@ class NotificationServer:
             error_tag = ''
             error_level = ErrorLevel.INFO
         
-        self.logger.info(f"Tag: {error_tag}, Level: {error_level}, Message: {message}")
-        
+        # 带错误处理的实现
+        try:
+            log_method = getattr(self.logger, error_level.lower())
+            log_method(f"Tag: {error_tag}, Level: {error_level}, Details: {details}")
+        except AttributeError:
+            # 如果方法不存在，默认使用 info 级别
+            self.logger.info(f"Tag: {error_tag}, Level: {error_level}, Details: {details}")
+                    
         # 发送通知
-        self.play_sound(message, error_tag, error_level)
-        self.send_mail(message, error_tag, error_level)
-        await self.send_discord(message, error_tag, error_level)
+        self.play_sound(message, details, error_tag, error_level)
+        self.send_mail(message, details, error_tag, error_level)
+        await self.send_discord(message, details, error_tag, error_level)
 
     async def handle_client(self, reader, writer):
         """处理客户端连接"""
@@ -709,7 +748,7 @@ class NotificationServer:
         # 删除PID文件
         try:
             os.remove(self.config['pid_file'])
-        except OSError:
+        except Exception as e:
             self.logger.error(f"Error in cleanup: {e}")
         
     async def cleanup_discord(self):
