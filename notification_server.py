@@ -153,11 +153,16 @@ class NotificationServer:
         try:
             self.logger.info("Reloading configuration from .env file...")
             
+            # 保存旧配置用于回滚
+            old_config = self.config.copy()
+            old_token = os.getenv('NF_DISCORD_TOKEN')
+            
             # 重新加载环境变量
             load_dotenv(override=True)
             
             # 更新配置
             new_config = NotificationConfig().config
+            new_token = os.getenv('NF_DISCORD_TOKEN')
             
             # 需要重启服务的配置项
             restart_required = ['port', 'buffer_size']
@@ -169,12 +174,11 @@ class NotificationServer:
             )
             
             # 更新配置
-            old_config = self.config.copy()
             self.config.update(new_config)
             
             # 处理Discord配置变化
             if (old_config['enable_discord'] != new_config['enable_discord'] or
-                os.getenv('NF_DISCORD_TOKEN') != self.discord_client._connection.token):
+                old_token != new_token):
                 # 使用 asyncio.run_coroutine_threadsafe 在事件循环中运行异步函数
                 future = asyncio.run_coroutine_threadsafe(
                     self.handle_discord_config_change(),
@@ -194,7 +198,7 @@ class NotificationServer:
             self.logger.error(f"Failed to reload configuration: {e}")
             # 还原配置
             self.config = old_config
-
+            
     async def handle_discord_config_change(self):
         """处理Discord配置变化"""
         try:
