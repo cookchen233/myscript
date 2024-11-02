@@ -7,6 +7,7 @@
 .project
 .history
 Thumbs.db
+.user.ini
 *.log
 .env
 /log

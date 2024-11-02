@@ -175,16 +175,30 @@ if [ "$is_all" = true ]; then
       ".git"
       ".DS_Store"
       ".idea"
+      ".vscode"
+      ".hbuilderx"
+      ".settings"
+      ".buildpath"
+      ".project"
       ".history"
+      "Thumbs.db"
       "log/" # 不加斜杠会排除log.*等所有文件
       "logs/"
       "upload/"
       "uploads/"
       "node_modules/"
       "runtime/"
-      "cert/"
+      "/cert/"
       "test/"
       "tests/"
+      "/build"
+      "/uni_modules/"
+      "/unpackage/"
+      ".tmp.driveupload"
+      "tmp.drivedownload"
+      "**/*.log"
+      "**/*.pid"
+
     )
 
     # 构建 rsync 的 exclude 参数
