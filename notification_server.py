@@ -119,6 +119,13 @@ class NotificationServer:
             self.discord_channel = None
             self.setup_discord()
         
+        # Discord 相关属性
+        self.discord_client = None
+        self.discord_channel = None
+        self.discord_connected = False
+        self.discord_lock = asyncio.Lock()
+        self.discord_heartbeat_task = None
+        
         # 添加 Discord 重试相关的属性
         self.discord_retry_interval = 3600  # 1小时
         self.discord_last_try = 0
@@ -420,116 +427,127 @@ class NotificationServer:
                 self.logger.error(f"Error in Discord retry check: {e}")
                 await asyncio.sleep(60)  # 发生错误时等待一分钟再继续
 
+    async def maintain_discord_connection(self):
+            """保持Discord连接的心跳任务"""
+            while True:
+                try:
+                    if self.config['enable_discord'] and self.discord_client:
+                        if not self.discord_client.is_ready():
+                            self.logger.warning("Discord disconnected, attempting to reconnect...")
+                            await self.discord_start()
+                    await asyncio.sleep(30)  # 每30秒检查一次
+                except Exception as e:
+                    self.logger.error(f"Error in Discord heartbeat: {e}")
+                    await asyncio.sleep(5)
+    
+
     
     async def discord_start(self):
         """异步启动Discord客户端"""
-        if self.config['enable_discord']:
+        if not self.config['enable_discord']:
+            return
+                
+        async with self.discord_lock:
+            if self.discord_connected:
+                return
+                    
             try:
                 self.logger.info("Starting Discord client...")
-                self.discord_last_try = time.time()
-                
                 token = os.getenv('NF_DISCORD_TOKEN')
-                channel_id = os.getenv('NF_DISCORD_CHANNEL_ID')
                 
-                # 验证配置
                 if not token:
-                    raise ValueError("Discord token not found in environment variables")
-                if not channel_id:
-                    raise ValueError("Discord channel ID not found in environment variables")
-                    
-                self.logger.info(f"Using token: {token[:10]}... and channel ID: {channel_id}")
+                    raise ValueError("Discord token not found")
                 
-                # 设置代理
+                # 配置客户端
+                intents = discord.Intents.default()
+                
+                # 代理配置
                 if self.config['enable_proxy']:
-                    # 设置环境变量代理
-                    os.environ['https_proxy'] = self.config['proxy_settings']['https']
-                    os.environ['http_proxy'] = self.config['proxy_settings']['http']
+                    self.logger.info(f"Using proxy: {self.config['proxy_settings']}")
                     
-                    # 创建代理连接器
-                    connector = aiohttp.TCPConnector(
-                        ssl=False,
-                        force_close=True,
-                        enable_cleanup_closed=True,
-                        ttl_dns_cache=300
-                    )
+                    # 根据代理类型选择连接器
+                    if self.config['proxy_settings']['socks']:
+                        # SOCKS代理
+                        connector = ProxyConnector.from_url(
+                            self.config['proxy_settings']['socks'],
+                            ssl=False
+                        )
+                        self.logger.info(f"Using SOCKS proxy: {self.config['proxy_settings']['socks']}")
+                    else:
+                        # HTTP/HTTPS代理
+                        connector = aiohttp.TCPConnector(
+                            ssl=False,
+                            force_close=True,
+                            enable_cleanup_closed=True,
+                            ttl_dns_cache=300
+                        )
+                        proxy_url = self.config['proxy_settings']['https']
+                        self.logger.info(f"Using HTTP proxy: {proxy_url}")
                     
-                    # 创建自定义session with proxy
-                    proxy_url = self.config['proxy_settings']['https']
-                    proxy_session = aiohttp.ClientSession(
+                    # 创建代理会话
+                    session = aiohttp.ClientSession(
                         connector=connector,
                         timeout=aiohttp.ClientTimeout(total=30),
                         headers={
-                            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
                         }
                     )
                     
-                    # 使用自定义session创建Discord客户端
-                    self.discord_client = discord.Client(
-                        intents=discord.Intents.default(),
-                        proxy=proxy_url,
-                        http_session=proxy_session
-                    )
-                    
-                    self.logger.info(f"Using HTTP(S) proxy: {proxy_url}")
+                    if not self.config['proxy_settings']['socks']:
+                        # 为HTTP代理设置proxy
+                        session._proxy = proxy_url
+                        session._proxy_auth = None
                 else:
-                    self.discord_client = discord.Client(intents=discord.Intents.default())
-                
-                # 确保客户端已设置事件处理程序
-                self.setup_discord()
-                
-                # 尝试连接，增加超时时间
-                self.logger.info("Attempting to connect to Discord...")
-                try:
-                    await asyncio.wait_for(
-                        self.discord_client.start(token),
-                        timeout=60  # 增加超时时间到60秒
+                    # 不使用代理
+                    session = aiohttp.ClientSession(
+                        timeout=aiohttp.ClientTimeout(total=30)
                     )
-                except asyncio.TimeoutError:
-                    self.logger.error("Discord connection timed out")
-                    raise
-                except Exception as e:
-                    self.logger.error(f"Discord connection failed: {e}")
-                    raise
                 
-                # 等待并验证频道连接
-                retry_count = 0
-                max_retries = 5
-                retry_delay = 2  # seconds
+                # 关闭旧的客户端
+                if self.discord_client:
+                    await self.discord_client.close()
                 
-                while not self.discord_channel and retry_count < max_retries:
-                    self.logger.info(f"Attempting to get channel {channel_id}, attempt {retry_count + 1}/{max_retries}")
-                    
+                # 创建新的Discord客户端
+                self.discord_client = discord.Client(
+                    intents=intents,
+                    http_session=session,
+                    proxy=self.config['proxy_settings']['https'] if self.config['enable_proxy'] else None
+                )
+                
+                # 设置事件处理
+                @self.discord_client.event
+                async def on_ready():
                     try:
-                        self.discord_channel = self.discord_client.get_channel(int(channel_id))
-                        
-                        if self.discord_channel:
-                            self.logger.info(f"Successfully connected to channel: {self.discord_channel.name}")
-                            break
+                        channel_id = os.getenv('NF_DISCORD_CHANNEL_ID')
+                        if not channel_id:
+                            raise ValueError("Channel ID not found")
                             
-                        self.logger.warning(f"Channel not found, retrying in {retry_delay} seconds...")
-                        await asyncio.sleep(retry_delay)
-                        retry_count += 1
+                        self.discord_channel = self.discord_client.get_channel(int(channel_id))
+                        if self.discord_channel:
+                            self.logger.info(f"Connected to Discord channel: {self.discord_channel.name}")
+                            self.discord_connected = True
+                        else:
+                            raise ValueError(f"Channel {channel_id} not found")
                     except Exception as e:
-                        self.logger.error(f"Error getting channel: {e}")
-                        await asyncio.sleep(retry_delay)
-                        retry_count += 1
-                        
-                if not self.discord_channel:
-                    raise Exception(f"Failed to get Discord channel after {max_retries} attempts")
-                    
-                self.logger.info("Discord connection established successfully")
+                        self.logger.error(f"Error in on_ready: {e}")
+                        self.discord_connected = False
+                
+                @self.discord_client.event
+                async def on_error(event, *args, **kwargs):
+                    self.logger.error(f"Discord event error: {event}", exc_info=True)
+                    self.discord_connected = False
+                
+                # 启动客户端
+                await self.discord_client.start(token)
                 
             except Exception as e:
-                self.logger.error(f"Failed to initialize Discord: {e}", exc_info=True)
-                self.config['enable_discord'] = False
-                # 清理资源
-                if hasattr(self, 'discord_client') and hasattr(self.discord_client, 'http_session'):
-                    try:
-                        await self.discord_client.http_session.close()
-                    except Exception as e:
-                        self.logger.error(f"Error closing Discord session: {e}")
-                        
-                                 
+                self.logger.error(f"Failed to start Discord: {e}")
+                self.discord_connected = False
+                if self.discord_client:
+                    await self.discord_client.close()
+                self.discord_client = None
+                raise
+                                     
     async def send_discord(self, message, error_tag, error_level):
         """发送Discord通知"""
         if not self.config['enable_discord']:
@@ -538,27 +556,26 @@ class NotificationServer:
         if not self.should_notify(error_tag, error_level, 'discord'):
             return
             
-        try:
-            # 检查客户端状态
-            if not self.discord_client or not self.discord_client.is_ready():
-                self.logger.warning("Discord client not ready, attempting to reconnect...")
-                await self.discord_start()
+        retries = 3
+        for attempt in range(retries):
+            try:
+                if not self.discord_connected or not self.discord_channel:
+                    await self.discord_start()
                 
-            # 尝试重新获取频道
-            if not self.discord_channel:
-                channel_id = os.getenv('NF_DISCORD_CHANNEL_ID')
-                self.discord_channel = self.discord_client.get_channel(int(channel_id))
-                
-            if self.discord_channel:
-                await self.discord_channel.send(f"[{error_level.upper()}] {message}")
-                self.logger.debug(f"Discord message sent for {error_level} message: {message}")
-            else:
-                raise Exception("Discord channel not available")
-                
-        except Exception as e:
-            self.logger.error(f"Failed to send Discord message: {e}", exc_info=True)
-            self.config['enable_discord'] = False  # 临时禁用Discord
-        
+                if self.discord_channel:
+                    await self.discord_channel.send(f"[{error_level.upper()}] {message}")
+                    self.logger.debug(f"Discord message sent: {message}")
+                    return
+                    
+            except discord.errors.HTTPException as e:
+                self.logger.warning(f"Discord HTTP error: {e}")
+                await asyncio.sleep(1)
+            except Exception as e:
+                self.logger.error(f"Discord error: {e}")
+                self.discord_connected = False
+                if attempt == retries - 1:
+                    raise
+                   
     async def process_message(self, message):
         """处理接收到的消息"""
         try:
@@ -596,13 +613,16 @@ class NotificationServer:
 
     async def run_server(self):
         """运行服务器"""
+        # 创建心跳任务
+        self.discord_heartbeat_task = asyncio.create_task(self.maintain_discord_connection())
+        
         server = await asyncio.start_server(
-            self.handle_client,
+            self.handle_client, 
             '0.0.0.0',
             self.config['port']
         )
         
-        self.logger.info(f"Notification server listening on port {self.config['port']}...")
+        self.logger.info(f"Server listening on port {self.config['port']}...")
         
         async with server:
             await server.serve_forever()
@@ -660,23 +680,18 @@ class NotificationServer:
 
     def cleanup(self):
         """清理资源"""
-        # 停止env文件监控
+        # 取消心跳任务
+        if self.discord_heartbeat_task:
+            self.discord_heartbeat_task.cancel()
+        
+        # 清理Discord资源
+        if self.discord_client:
+            self.loop.run_until_complete(self.cleanup_discord())
+        
+        # 清理其他资源
         if hasattr(self, 'env_observer'):
             self.env_observer.stop()
             self.env_observer.join()
-        
-        # 清理Discord资源
-        if hasattr(self, 'discord_client'):
-            if hasattr(self.discord_client, 'http_session'):
-                try:
-                    self.loop.run_until_complete(self.discord_client.http_session.close())
-                except Exception as e:
-                    self.logger.error(f"Error closing Discord session: {e}")
-            if self.discord_client and not self.discord_client.is_closed():
-                try:
-                    self.loop.run_until_complete(self.discord_client.close())
-                except Exception as e:
-                    self.logger.error(f"Error closing Discord client: {e}")
         
         # 清理事件循环任务
         if hasattr(self, 'loop') and self.loop.is_running():
@@ -691,7 +706,18 @@ class NotificationServer:
         try:
             os.remove(self.config['pid_file'])
         except OSError:
-            pass
+            self.logger.error(f"Error in cleanup: {e}")
+        
+    async def cleanup_discord(self):
+        """清理Discord相关资源"""
+        if self.discord_client:
+            try:
+                if hasattr(self.discord_client, 'http_session'):
+                    await self.discord_client.http_session.close()
+                if not self.discord_client.is_closed():
+                    await self.discord_client.close()
+            except Exception as e:
+                self.logger.error(f"Error closing Discord client: {e}")
 
 def main():
     # 设置SIGHUP信号处理
