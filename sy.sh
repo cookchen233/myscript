@@ -208,7 +208,7 @@ if [ "$is_all" = true ]; then
     done
 
     # rsync 同步
-    eval "rsync -avz --rsh=\"ssh -p $PORT\" --no-perms --no-owner --no-group $exclude_params \"$LOCAL_DIR\" \"$REMOTE_USER@$REMOTE_IP:$REMOTE_DIR\""
+    eval "rsync -avzP --rsh=\"ssh -p $PORT\" --no-perms --no-owner --no-group $exclude_params \"$LOCAL_DIR\" \"$REMOTE_USER@$REMOTE_IP:$REMOTE_DIR\""
 
     # 构建 find 命令的条件（只针对文件的排除，目录不需要包含在权限设置中）
     find_conditions=""

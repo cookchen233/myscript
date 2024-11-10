@@ -74,19 +74,45 @@ class NotificationConfig:
     }
 
 class EnvFileHandler(FileSystemEventHandler):
-    def __init__(self, server):
+    def __init__(self, server, env_file_path):
         self.server = server
+        self.env_file_path = env_file_path
         self.last_reload = 0
         self.reload_interval = 1  # 最小重载间隔(秒)
+        self.last_modified_time = os.path.getmtime(env_file_path)  # 记录文件的最后修改时间
 
     def on_modified(self, event):
+        # 确保是目标文件被修改
+        if os.path.abspath(event.src_path) != self.env_file_path:
+            return
+
         try:
-            self.server.logger.info(f"File modified: {event.src_path}")
-            if event.src_path.endswith('.env'):
-                self.server.logger.info(".env file modified, reloading configuration...")
-                current_time = time.time()
-                if current_time - self.last_reload >= self.reload_interval:
-                    self.last_reload = current_time
+            # 检查文件实际修改时间是否变化
+            current_modified_time = os.path.getmtime(self.env_file_path)
+            if current_modified_time == self.last_modified_time:
+                return
+            
+            self.last_modified_time = current_modified_time
+            
+            self.server.logger.info(f"Detected modification in .env file: {event.src_path}")
+            current_time = time.time()
+            if current_time - self.last_reload >= self.reload_interval:
+                self.last_reload = current_time
+                if asyncio.iscoroutinefunction(self.server.reload_config):
+                    # 创建任务但不等待结果
+                    future = asyncio.run_coroutine_threadsafe(
+                        self.server.reload_config(),
+                        self.server.loop
+                    )
+                    # 添加回调来处理完成或错误
+                    def done_callback(fut):
+                        try:
+                            fut.result()
+                        except Exception as e:
+                            self.server.logger.error(f"Error in reload_config: {e}", exc_info=True)
+                    
+                    future.add_done_callback(done_callback)
+                else:
                     self.server.reload_config()
         except Exception as e:
             self.server.logger.error(f"Error in EnvFileHandler.on_modified: {e}", exc_info=True)
@@ -140,29 +166,27 @@ class NotificationServer:
         self.setup_env_monitor()
         self.logger.info("Discord event handlers...")
 
+
     def setup_env_monitor(self):
         """设置.env文件监控"""
         self.env_observer = Observer()
-        handler = EnvFileHandler(self)
-        
-        # 获取脚本所在目录
+        # 获取脚本所在目录下的.env文件路径
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        # 构造.env文件的完整路径
-        env_path = os.path.join(script_dir, '.env')
+        env_file_path = os.path.join(script_dir, '.env')
         
         # 检查文件是否存在
-        if not os.path.exists(env_path):
-            error_msg = f".env file not found at {env_path}"
+        if not os.path.exists(env_file_path):
+            error_msg = f".env file not found at {env_file_path}"
             self.logger.error(error_msg)
             raise FileNotFoundError(error_msg)
         
-        env_dir = os.path.dirname(env_path)
+        handler = EnvFileHandler(self, env_file_path)
+        env_dir = os.path.dirname(env_file_path)
         self.env_observer.schedule(handler, env_dir, recursive=False)
         self.env_observer.start()
-        self.logger.info("Started monitoring .env file for changes")
-            
-    # 在 reload_config 方法中修改:
-    def reload_config(self):
+        self.logger.info(f"Started monitoring .env file at {env_file_path}")
+                
+    async def reload_config(self):
         """重新加载配置"""
         try:
             self.logger.info("Reloading configuration from .env file...")
@@ -193,14 +217,9 @@ class NotificationServer:
             # 处理Discord配置变化
             if (old_config['enable_discord'] != new_config['enable_discord'] or
                 old_token != new_token):
-                # 使用 asyncio.run_coroutine_threadsafe 在事件循环中运行异步函数
-                future = asyncio.run_coroutine_threadsafe(
-                    self.handle_discord_config_change(),
-                    self.loop
-                )
-                # 等待异步操作完成
-                future.result()
-                
+                # 直接await异步函数
+                await self.handle_discord_config_change()
+                    
             if need_restart:
                 self.logger.info("Configuration changes require server restart")
                 # 发送重启信号
@@ -209,10 +228,10 @@ class NotificationServer:
                 self.logger.info("Configuration reloaded successfully")
                 
         except Exception as e:
-            self.logger.error(f"Failed to reload configuration: {e}")
+            self.logger.error(f"Failed to reload configuration: {e}", exc_info=True)
             # 还原配置
             self.config = old_config
-            
+    
     async def handle_discord_config_change(self):
         """处理Discord配置变化"""
         try:
@@ -227,6 +246,7 @@ class NotificationServer:
                 self.setup_discord()
                 await self.discord_start()
             else:
+                self.discord_connected = False
                 self.discord_client = None
                 self.discord_channel = None
                 
@@ -332,7 +352,7 @@ class NotificationServer:
             if os.path.exists(sound_file):
                 if sys.platform == 'darwin':  # macOS
                     subprocess.run(['afplay', sound_file])
-                    self.logger.debug(f"Sound effect played for {error_level} message")
+                    # self.logger.debug(f"Sound effect played for {error_level} message")
             else:
                 self.logger.warning(f"Sound file not found: {sound_file}")
                 
@@ -362,7 +382,8 @@ class NotificationServer:
                     font-family: 'Helvetica', sans-serif; /* 简洁现代 */
                 }}
                 h2{{
-                    font-size:14px;
+                    font-size:16px;
+                    font-weight: bold;
                     color: #333;
                 }}
                 pre {{
@@ -494,17 +515,56 @@ class NotificationServer:
                 await asyncio.sleep(60)  # 发生错误时等待一分钟再继续
 
     async def maintain_discord_connection(self):
-            """保持Discord连接的心跳任务"""
-            while True:
-                try:
-                    if self.config['enable_discord'] and self.discord_client:
-                        if not self.discord_client.is_ready():
-                            self.logger.warning("Discord disconnected, attempting to reconnect...")
-                            await self.discord_start()
-                    await asyncio.sleep(30)  # 每30秒检查一次
-                except Exception as e:
-                    self.logger.error(f"Error in Discord heartbeat: {e}")
-                    await asyncio.sleep(5)
+        """保持Discord连接的心跳任务"""
+        NORMAL_CHECK_INTERVAL = 30  # 正常检查间隔
+        ERROR_RETRY_INTERVAL = 5    # 错误后重试间隔
+        MAX_RETRIES = 3            # 最大连续重试次数
+        
+        retry_count = 0
+        first_connect = True
+        
+        while True:
+            try:
+                # 检查是否启用Discord功能
+                if not self.config['enable_discord']:
+                    await asyncio.sleep(NORMAL_CHECK_INTERVAL)
+                    continue
+
+                # 检查客户端实例是否存在
+                if not self.discord_client:
+                    self.logger.info("Initializing Discord client...")
+                    await self.discord_start()
+                    await asyncio.sleep(ERROR_RETRY_INTERVAL)
+                    continue
+
+                # 检查连接状态
+                if not self.discord_client.is_ready():
+                    if first_connect:
+                        self.logger.info("Establishing initial Discord connection...")
+                        first_connect = False
+                    else:
+                        self.logger.warning("Discord connection lost, attempting to reconnect...")
+                    
+                    await self.discord_start()
+                    retry_count += 1
+                    
+                    if retry_count >= MAX_RETRIES:
+                        self.logger.error(f"Failed to reconnect after {MAX_RETRIES} attempts, waiting longer...")
+                        await asyncio.sleep(NORMAL_CHECK_INTERVAL * 2)
+                        retry_count = 0
+                    else:
+                        await asyncio.sleep(ERROR_RETRY_INTERVAL)
+                    continue
+                
+                # 连接正常，重置状态
+                first_connect = False
+                retry_count = 0
+                await asyncio.sleep(NORMAL_CHECK_INTERVAL)
+
+            except Exception as e:
+                self.logger.error(f"Error in Discord heartbeat: {str(e)}", exc_info=True)
+                retry_count += 1
+                await asyncio.sleep(ERROR_RETRY_INTERVAL)
     
     async def discord_start(self):
         """异步启动Discord客户端"""
@@ -618,15 +678,14 @@ class NotificationServer:
             data = json.loads(message)
             error_tag = str(data.get('error_tag', ''))
             error_level = data.get('error_level', 'info').lower()
-            message = data.get('message', message)
-            details = data.get('details')
+            title = data.get('message', message)
+            details = str(data.get('details', ''))  # 将 None 转换为字符串
             
             if error_level not in [ErrorLevel.DEBUG, ErrorLevel.INFO, ErrorLevel.ERROR]:
                 error_level = ErrorLevel.INFO
                 
-        except json.JSONDecodeError:
-            error_tag = ''
-            error_level = ErrorLevel.INFO
+        except json.JSONDecodeError as e:
+            self.logger.info(f"json loads message 处理异常 {message}")
         
         # 带错误处理的实现
         try:
@@ -637,9 +696,9 @@ class NotificationServer:
             self.logger.info(f"Tag: {error_tag}, Level: {error_level}, Details: {details}")
                     
         # 发送通知
-        self.play_sound(message, details, error_tag, error_level)
-        self.send_mail(message, details, error_tag, error_level)
-        await self.send_discord(message, details, error_tag, error_level)
+        self.play_sound(title, details, error_tag, error_level)
+        self.send_mail(title, details, error_tag, error_level)
+        await self.send_discord(title, details, error_tag, error_level)
 
     async def handle_client(self, reader, writer):
         """处理客户端连接"""
