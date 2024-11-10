@@ -23,7 +23,7 @@ from aiohttp_socks import ProxyConnector
 # 加载环境变量
 load_dotenv()
 
-# 错误级别定义
+# 消息类型定义
 class ErrorLevel:
     DEBUG = 'debug'
     INFO = 'info'
@@ -39,7 +39,11 @@ class NotificationConfig:
         'max_log_size': int(os.getenv('NF_MAX_LOG_SIZE', 10 * 1024 * 1024)),  # 10MB
         'backup_count': int(os.getenv('NF_BACKUP_COUNT', 5)),
         
-        # 邮件配置
+        # 通知频率
+        'notify_intervals': self.parse_intervals(os.getenv("NF_INTERVALS")),
+        
+        # 邮件
+        'enable_mail': os.getenv('NF_ENABLE_MAIL', 'true').lower() == 'true',
         'smtp_host': os.getenv('NF_SMTP_HOST', 'smtp.example.com'),
         'smtp_port': int(os.getenv('NF_SMTP_PORT', 465)),
         'smtp_user': os.getenv('NF_SMTP_USER', 'user@example.com'),
@@ -47,31 +51,37 @@ class NotificationConfig:
         'mail_from': os.getenv('NF_MAIL_FROM', 'notification@example.com'),
         'mail_to': os.getenv('NF_MAIL_TO', 'admin@example.com').split(','),
         
-        # 通知配置
-        'notify_interval': {  # 单位：秒
-            ErrorLevel.DEBUG: int(os.getenv('NF_DEBUG_INTERVAL', 300)),
-            ErrorLevel.INFO: int(os.getenv('NF_INFO_INTERVAL', 300)),
-            ErrorLevel.ERROR: int(os.getenv('NF_ERROR_INTERVAL', 60))
-        },
-        
-        # 通知方式开关
-        'enable_sound': os.getenv('NF_ENABLE_SOUND', 'true').lower() == 'true',
-        'sound_file': os.getenv('NF_SOUND_FILE', '/System/Library/Sounds/Ping.aiff'),
-        'enable_mail': os.getenv('NF_ENABLE_MAIL', 'true').lower() == 'true',
-        'enable_discord': os.getenv('NF_ENABLE_DISCORD', 'true').lower() == 'true',
-        
-        # 声音配置
+        # 声音
         'enable_sound': os.getenv('NF_ENABLE_SOUND', 'true').lower() == 'true',
         'sound_file': os.getenv('NF_SOUND_FILE', '/System/Library/Sounds/Ping.aiff'),
         'say_message': os.getenv('NF_SAY_MESSAGE', 'false').lower() == 'true',
+        
+        # discord
+        'enable_discord': os.getenv('NF_ENABLE_DISCORD', 'true').lower() == 'true',
+        'enable_proxy': os.getenv('NF_ENABLE_PROXY', 'false').lower() == 'true',
         
         'proxy_settings': {
             'https': os.getenv('NF_HTTPS_PROXY', 'http://127.0.0.1:8001'),
             'http': os.getenv('NF_HTTP_PROXY', 'http://127.0.0.1:8001'),
             'socks': os.getenv('NF_SOCKS_PROXY', 'socks5://127.0.0.1:1081')
         },
-        'enable_proxy': os.getenv('NF_ENABLE_PROXY', 'false').lower() == 'true',
     }
+        
+    def parse_intervals(self, env_string):
+        if not env_string:
+            return {}
+        
+        result = {}
+        # 用分号分割不同配置项
+        pairs = env_string.split(';')
+        
+        for pair in pairs:
+            # 用冒号分割key和value
+            key, value = pair.split(':')
+            # 将value转换为整数
+            result[key] = int(value)
+        
+        return result
 
 class EnvFileHandler(FileSystemEventHandler):
     def __init__(self, server, env_file_path):
@@ -310,27 +320,25 @@ class NotificationServer:
             self.logger.error(f"Failed to restart server: {e}")
             sys.exit(1)
 
-    def should_notify(self, error_tag: str, error_level: str, notify_type: str) -> bool:
+    def should_notify(self, data, notify_type) -> bool:
         """
         判断是否应该发送通知
         
         Args:
-            error_tag: 错误标签
-            error_level: 错误级别
+            message_tag: 消息标签
+            message_type: 消息类型
             notify_type: 通知类型 (sound/mail/discord)
             
         Returns:
             bool: 是否应该发送通知
         """
-        if not error_tag:
-            return True
             
         current_time = time.time()
-        history_key = f"{error_tag}_{notify_type}"
+        history_key = f"{data["program_name"]}_{data["message_type"]}_{data["message_tag"]}_{notify_type}"
         
         if history_key in self.notification_history:
             last_time = self.notification_history[history_key]
-            interval = self.config['notify_interval'].get(error_level, 300)
+            interval = self.config['notify_intervals'].get(data["message_type"], 300)
             
             if current_time - last_time < interval:
                 return False
@@ -338,12 +346,9 @@ class NotificationServer:
         self.notification_history[history_key] = current_time
         return True
 
-    def play_sound(self, message, details, error_tag, error_level):
+    def play_sound(self, data):
         """播放声音通知"""
         if not self.config['enable_sound']:
-            return
-            
-        if not self.should_notify(error_tag, error_level, 'sound'):
             return
             
         try:
@@ -351,27 +356,22 @@ class NotificationServer:
             sound_file = self.config['sound_file']
             if os.path.exists(sound_file):
                 if sys.platform == 'darwin':  # macOS
+                    self.logger.debug(f"Sound played: [{data["program_name"]}] [{data["message_type"]}]")
                     subprocess.run(['afplay', sound_file])
-                    # self.logger.debug(f"Sound effect played for {error_level} message")
             else:
                 self.logger.warning(f"Sound file not found: {sound_file}")
                 
             # 播放语音消息
             if self.config['say_message'] and sys.platform == 'darwin':
-                # 截取前10个字符
-                short_message = message[:10]
-                subprocess.run(['say', short_message])
-                self.logger.debug(f"Voice message played: {short_message}")
+                self.logger.debug(f"Voice played: [{data["program_name"]}] [{data["message_type"]}] {data["title"][:10]}")
+                subprocess.run(['say', f"{data["title"][:10]}"])
                 
         except Exception as e:
             self.logger.error(f"Failed to play sound: {e}")
 
-    def send_mail(self, message, details, error_tag, error_level):
+    def send_mail(self, data):
         """发送邮件通知"""
         if not self.config['enable_mail']:
-            return
-            
-        if not self.should_notify(error_tag, error_level, 'mail'):
             return
             
         try:
@@ -385,6 +385,7 @@ class NotificationServer:
                     font-size:16px;
                     font-weight: bold;
                     color: #333;
+                    margin-bottom: 10px;
                 }}
                 pre {{
                     font-size:12px;
@@ -392,12 +393,12 @@ class NotificationServer:
             </style>
             </head>
             <body>
-            <h2>{message}</h2>
-            <p><pre>{details}</pre></p>
+            <h2>{data["title"]}</h2>
+            <p><pre>{data["details"]}</pre></p>
             </body></html>
             """
             msg = MIMEText(html_content, 'html', 'utf-8')
-            msg['Subject'] = Header(f'[{error_level.upper()}] 系统通知', 'utf-8')
+            msg['Subject'] = Header(f'系统通知 [{data["program_name"]}] [{data["message_type"]}]', 'utf-8')
             msg['From'] = self.config['mail_from']
             msg['To'] = ','.join(self.config['mail_to'])
             
@@ -405,16 +406,13 @@ class NotificationServer:
                 smtp.login(self.config['smtp_user'], self.config['smtp_pass'])
                 smtp.send_message(msg)
                     
-            self.logger.debug(f"Mail sent for {error_level} message: {message}")
+            self.logger.debug(f"Mail sent: [{data["program_name"]}] [{data["message_type"]}]")
         except Exception as e:
             self.logger.error(f"Failed to send mail: {e}")
             
-    async def send_discord(self, message, details, error_tag, error_level):
+    async def send_discord(self, data):
             """发送Discord通知"""
             if not self.config['enable_discord']:
-                return
-                
-            if not self.should_notify(error_tag, error_level, 'discord'):
                 return
                 
             retries = 3
@@ -424,8 +422,8 @@ class NotificationServer:
                         await self.discord_start()
                     
                     if self.discord_channel:
-                        await self.discord_channel.send(f"[{error_level.upper()}] \n {message} \n {details}")
-                        self.logger.debug(f"Discord message sent: {message}")
+                        await self.discord_channel.send(f"[{data["program_name"]}] [{data["message_type"]}]\n{data["title"]}\n\n{data["details"]}")
+                        self.logger.debug(f"Discord sent: [{data["program_name"]}] [{data["message_type"]}]")
                         return
                         
                 except discord.errors.HTTPException as e:
@@ -675,30 +673,26 @@ class NotificationServer:
     async def process_message(self, message):
         """处理接收到的消息"""
         try:
-            data = json.loads(message)
-            error_tag = str(data.get('error_tag', ''))
-            error_level = data.get('error_level', 'info').lower()
-            title = data.get('message', message)
-            details = str(data.get('details', ''))  # 将 None 转换为字符串
-            
-            if error_level not in [ErrorLevel.DEBUG, ErrorLevel.INFO, ErrorLevel.ERROR]:
-                error_level = ErrorLevel.INFO
-                
+            json_data = json.loads(message)
+            data = {
+                "program_name": str(json_data.get('program_name', 'Program name not specified')),
+                "message_type": json_data.get('message_type', 'error'),
+                "message_tag": str(json_data.get('message_tag', '')),
+                "title": str(json_data.get('title', 'Title not specified')),
+                "details": str(json_data.get('details', '')),
+            }
         except json.JSONDecodeError as e:
-            self.logger.info(f"json loads message 处理异常 {message}")
+            return self.logger.info(f"json loads message 处理异常 {message}")
         
-        # 带错误处理的实现
-        try:
-            log_method = getattr(self.logger, error_level.lower())
-            log_method(f"Tag: {error_tag}, Level: {error_level}, Details: {details}")
-        except AttributeError:
-            # 如果方法不存在，默认使用 info 级别
-            self.logger.info(f"Tag: {error_tag}, Level: {error_level}, Details: {details}")
+        self.logger.info(f"Received message: [{data["program_name"]}] [{data["message_type"]}]\nTitle: {data["title"]}\n\nDetails: {data["details"]}")
                     
         # 发送通知
-        self.play_sound(title, details, error_tag, error_level)
-        self.send_mail(title, details, error_tag, error_level)
-        await self.send_discord(title, details, error_tag, error_level)
+        if self.should_notify(data, 'sound'):
+            self.play_sound(data)
+        if self.should_notify(data, 'mail'):
+            self.send_mail(data)
+        if self.should_notify(data, 'discord'):
+            await self.send_discord(data)
 
     async def handle_client(self, reader, writer):
         """处理客户端连接"""
