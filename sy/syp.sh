@@ -128,7 +128,6 @@ EOF
     return 0
 }
 
-# rsync同步函数
 do_rsync() {
     local target=$1
     local is_all=$2
@@ -137,20 +136,17 @@ do_rsync() {
     timer_start "rsync同步"
     echo -e "\033[1;34m[SYNC] 开始同步...\033[1;0m"
 
-    HOME_WORK_PATH=$(pwd)
-    SERVER_HOME_WORK_PATH="/www/wwwroot/"
-    PORT=22
+    local HOME_WORK_PATH=$(pwd)
+    local SERVER_HOME_WORK_PATH=${_ROOT:-"/www/wwwroot/"}
+    local PORT=${_PORT:-22}
 
-    LOCAL_DIR=$HOME_WORK_PATH$PUSH_PATH
-    REMOTE_DIR=$SERVER_HOME_WORK_PATH$TO_PATH
-
-    [[ "$_ROOT" != null ]] && SERVER_HOME_WORK_PATH=$_ROOT
-    [[ "$_PORT" != null ]] && PORT=$_PORT
+    local LOCAL_DIR=$HOME_WORK_PATH$PUSH_PATH
+    local REMOTE_DIR=$SERVER_HOME_WORK_PATH$TO_PATH
 
     setup_ssh_controlmaster "$REMOTE_USER" "$REMOTE_IP" "$PORT"
 
     # 通用rsync选项
-    RSYNC_OPTS=(
+    local RSYNC_OPTS=(
         -az
         --rsh="ssh -p $PORT -o ControlPath=$SSH_CONTROL_PATH"
         --no-perms
@@ -163,85 +159,90 @@ do_rsync() {
         --no-whole-file
     )
 
-    if [ "$is_all" == true ]; then
-        # 全量同步逻辑
-        exclude_items=(
-            ".user.ini"
-            ".env"
-            ".git"
-            ".DS_Store"  
-            ".idea"
-            ".vscode"
-            ".hbuilderx"
-            ".settings"
-            ".buildpath"
-            ".project"
-            ".history"
-            "Thumbs.db"
-            "log/"
-            "logs/"
-            "upload/"
-            "uploads/"
-            "node_modules/"
-            "runtime/"
-            "/cert/"
-            "test/"
-            "tests/"
-            "/build"
-            "/uni_modules/"
-            "/unpackage/"
-            ".tmp.driveupload"
-            "tmp.drivedownload"
-            "**/*.log"
-            "**/*.pid"
-        )
+    # 定义特殊权限文件
+    local special_perm_files=(".user.ini")
+    local special_files_pattern
+    special_files_pattern="$(printf "! -name '%s' " "${special_perm_files[@]}")"
+    # 设置权限的函数
+    set_permissions() {
+        echo -e "\033[1;34m[PERM] 设置权限...\033[0m"
+        if ! ssh -o ControlPath="$SSH_CONTROL_PATH" -p "$PORT" "$REMOTE_USER@$REMOTE_IP" "
+            cd '$REMOTE_DIR' && {
+                find . -type d -exec chmod 755 {} + &
+                find . -type f $special_files_pattern -exec chmod 644 {} + &
+                wait
+                find . $special_files_pattern -exec chown www:www {} +
+            }"; then
+            echo -e "\033[1;31m[PERM] 权限设置失败\033[0m" >&2
+            return 1
+        fi
+    }
 
+    # 执行rsync同步
+    do_sync() {
+        local cmd=("${RSYNC_OPTS[@]}")
+        if [ -n "$2" ]; then
+            cmd+=("--files-from=$2")
+        fi
+        if ! rsync "${cmd[@]}" "$LOCAL_DIR/" "$REMOTE_USER@$REMOTE_IP:$REMOTE_DIR/"; then
+            echo -e "\033[1;31m[SYNC] 同步失败\033[0m" >&2
+            echo "1" > "$SYNC_STATUS_FILE"
+            return 1
+        fi
+    }
+
+    if [ "$is_all" == true ]; then
+        # 从.gitignore构建排除项
+        local exclude_items=(".git" ".git*")
+        
+        # 读取.gitignore
+        if [[ -f .gitignore ]]; then
+            while IFS= read -r line; do
+                [[ -z "$line" || "$line" =~ ^# || "$line" =~ ^\.git ]] && continue
+                exclude_items+=("$line")
+            done < .gitignore
+        fi
+
+        # 构建rsync排除选项
         for item in "${exclude_items[@]}"; do
             RSYNC_OPTS+=("--exclude=$item")
         done
 
-        if ! rsync "${RSYNC_OPTS[@]}" "$LOCAL_DIR" "$REMOTE_USER@$REMOTE_IP:$REMOTE_DIR"; then
-            echo -e "\033[1;31m[SYNC] 同步失败\033[1;0m" >&2
-            echo "1" > "$SYNC_STATUS_FILE"
-            return 1
-        fi
-
-        # 权限设置
-        ssh -o ControlPath="$SSH_CONTROL_PATH" -p "$PORT" "$REMOTE_USER@$REMOTE_IP" "
-            find '$REMOTE_DIR' -type d -exec chmod 755 {} + & 
-            find '$REMOTE_DIR' -type f ! -name '.user.ini' -exec chmod 644 {} + &
-            wait
-            find '$REMOTE_DIR' ! -name '.user.ini' -exec chown www:www {} +"
-
+        echo -e "\033[1;34m[SYNC] 开始全量同步...\033[0m"
+        do_sync || return 1
+        set_permissions || return 1
     else
         # 差异同步逻辑
-        if files=$(git diff --name-only HEAD~1...HEAD) && [ -n "$files" ]; then
-            echo "待同步的文件列表"
-            echo "--------------------------------"
-            echo -e "$files"
-            echo "--------------------------------"
-            
-            temp_file_list=$(mktemp)
-            echo "$files" > "$temp_file_list"
-
-            if ! rsync "${RSYNC_OPTS[@]}" --files-from="$temp_file_list" \
-                "$LOCAL_DIR" "$REMOTE_USER@$REMOTE_IP:$REMOTE_DIR"; then
-                rm -f "$temp_file_list"
-                echo -e "\033[1;31m[SYNC] 同步失败\033[1;0m" >&2
-                echo "1" > "$SYNC_STATUS_FILE"
-                return 1
-            fi
-
-            rm -f "$temp_file_list"
-
-            ssh -o ControlPath="$SSH_CONTROL_PATH" -p "$PORT" "$REMOTE_USER@$REMOTE_IP" "
-                find '$REMOTE_DIR' -type d -exec chmod 755 {} + &
-                find '$REMOTE_DIR' -type f ! -name '.user.ini' -exec chmod 644 {} + &
-                wait
-                find '$REMOTE_DIR' ! -name '.user.ini' -exec chown www:www {} +"
+        local files
+        if [ -n "$branch_for_diff" ]; then
+            # 如果指定了比较分支，就与指定的分支比较
+            files=$(git diff --name-only "$branch_for_diff"...HEAD)
         else
-            echo -e "\033[1;34m[SYNC] 没有检测到变更，跳过同步\033[1;0m"
+            # 默认与上一次提交比较
+            files=$(git diff --name-only HEAD~1...HEAD)
         fi
+
+        if [ $? -ne 0 ] || [ -z "$files" ]; then
+            echo -e "\033[1;34m[SYNC] 没有检测到变更，跳过同步\033[0m"
+            return 0
+        fi
+
+        echo -e "\033[1;34m待同步的文件列表:\033[0m"
+        echo "--------------------------------"
+        echo -e "$files"
+        echo "--------------------------------"
+
+        local temp_file_list
+        if ! temp_file_list=$(mktemp); then
+            echo -e "\033[1;31m[SYNC] 创建临时文件失败\033[0m" >&2
+            return 1
+        fi
+        trap 'rm -f "$temp_file_list"' EXIT
+        echo "$files" > "$temp_file_list"
+
+        echo -e "\033[1;34m[SYNC] 开始增量同步...\033[0m"
+        do_sync "" "$temp_file_list" || return 1
+        set_permissions || return 1
     fi
 
     echo "0" > "$SYNC_STATUS_FILE"

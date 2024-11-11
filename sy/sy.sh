@@ -349,119 +349,126 @@ handle_rsync_error() {
     switch_back 1
 }
 
+# 基础的rsync选项
+declare -a base_rsync_opts=(
+    --rsh="ssh -p $PORT -o ControlPath=~/.ssh/controlmasters/%r@%h:%p"
+    --no-perms
+    --no-owner
+    --no-group
+    --compress-level=9
+    --stats
+    --numeric-ids
+    --inplace
+    --no-whole-file
+)
+
+# 构建special_perm条件
+declare -a special_perm_files=(
+    ".user.ini"    # PHP user config
+)
+special_perm=""
+for file in "${special_perm_files[@]}"; do
+    special_perm+="! -name '$file' "
+done
+
 if [ "$is_all" == true ]; then
-    read -p "是否要进行全量同步？(将覆盖服务器所有文件, 请注意某些文件对服务器的影响, 如 .env, /runtime, /node_modules, /logs 等) [y/n]: " choice
-    if [ -z "$choice" ] || [ "$choice" = "y" ] || [ "$choice" = "Y" ]; then
-        # 定义需要排除的文件和目录
-        exclude_items=(
-            ".user.ini"
-            ".env"
+    read -p "是否要进行全量同步？(将覆盖服务器所有文件, 请注意某些文件对服务器的影响, 如 .env, /runtime, /node_modules, /logs 等) [Y/n]: " choice
+    if [ -z "$choice" ] || [[ $choice =~ ^[Yy]$ ]]; then
+        # 初始化排除项
+        declare -a exclude_items=(
             ".git"
-            ".DS_Store"
-            ".idea"
-            ".vscode"
-            ".hbuilderx"
-            ".settings"
-            ".buildpath"
-            ".project"
-            ".history"
-            "Thumbs.db"
-            "log/"
-            "logs/"
-            "upload/"
-            "uploads/"
-            "node_modules/"
-            "runtime/"
-            "/cert/"
-            "test/"
-            "tests/"
-            "/build"
-            "/uni_modules/"
-            "/unpackage/"
-            ".tmp.driveupload"
-            "tmp.drivedownload"
-            "**/*.log"
-            "**/*.pid"
+            ".git*"
         )
-        # 构建 rsync 的 exclude 参数
-        exclude_params=""
+
+        # 从.gitignore读取排除项
+        if [[ -f .gitignore ]]; then
+            while IFS= read -r line; do
+                [[ -z "$line" || "$line" =~ ^# || "$line" =~ ^\.git ]] && continue
+                exclude_items+=("$line")
+            done < .gitignore
+        else
+            echo -e "\033[1;33m警告: .gitignore 文件不存在\033[0m" >&2
+        fi
+
+        # 构建全量同步的rsync选项
+        declare -a rsync_opts=(
+            "${base_rsync_opts[@]}"
+            -azP
+            --compress-level=9
+            --stats
+        )
+
+        # 添加排除项
         for item in "${exclude_items[@]}"; do
-            exclude_params="$exclude_params --exclude='$item'"
+            rsync_opts+=(--exclude="$item")
         done
 
-        # rsync 同步文件
-        echo -e "\033[1;34m同步所有文件: \n$LOCAL_DIR => $REMOTE_DIR\033[1;0m"
-        rsync_output=$(eval "rsync -azP \
-            --rsh=\"ssh -p $PORT -o ControlPath=~/.ssh/controlmasters/%r@%h:%p\" \
-            --no-perms --no-owner --no-group \
-            --compress-level=9 \
-            --stats \
-            $exclude_params \
-            \"$LOCAL_DIR/\" \"$REMOTE_USER@$REMOTE_IP:$REMOTE_DIR/\"" 2>&1)
-        ret=$?
-
-        # 显示rsync输出
-        echo "$rsync_output"
-
-        # 检查失败情况
-        ((ret != 0)) && handle_rsync_error "$rsync_output" "$ret"
-
-        # ... [权限设置部分保持不变]
+        # 执行文件同步
+        echo -e "\033[1;34m[SYNC] 开始全量同步:\n$LOCAL_DIR => $REMOTE_DIR\033[0m"
+        if rsync_output=$(rsync "${rsync_opts[@]}" \
+            "$LOCAL_DIR/" "$REMOTE_USER@$REMOTE_IP:$REMOTE_DIR/" 2>&1); then
+            echo "$rsync_output"
+        else
+            echo "$rsync_output"
+            handle_rsync_error "$rsync_output" $?
+        fi
 
     else
-        echo -e "\033[1;31m已放弃同步\033[1;0m"
+        echo -e "\033[1;31m已取消同步\033[0m"
         switch_back 1
     fi
 
 else
-    # 获取所有改变的文件列表
+    # 获取变更文件列表
     if ! files=$(git diff --name-only HEAD~1...HEAD 2>/dev/null) || [ -z "$files" ]; then
-        echo -e "\033[1;34m没有检测到文件变更，跳过同步\033[1;0m"
-        exit 0
+        echo -e "\033[1;34m没有检测到文件变更，跳过同步\033[0m"
+        switch_back 1
     fi
 
-    echo -e "\033[1;34m待同步的文件列表:\033[1;0m"
+    echo -e "\033[1;34m待同步的文件列表:\033[0m"
     echo "--------------------------------"
     echo -e "$files"
     echo "--------------------------------"
 
     # 创建临时文件列表
     temp_file_list=$(mktemp)
+    trap 'rm -f "$temp_file_list"' EXIT
     echo "$files" > "$temp_file_list"
 
-    # 使用rsync同步变更的文件
-    echo -e "\033[1;34m开始同步变更文件...\033[1;0m"
-    rsync_output=$(rsync -avz --rsh="ssh -p $PORT -o ControlPath=~/.ssh/controlmasters/%r@%h:%p" \
-        --no-perms --no-owner --no-group \
-        --files-from="$temp_file_list" \
-        "$LOCAL_DIR/" "$REMOTE_USER@$REMOTE_IP:$REMOTE_DIR/" 2>&1)
-    ret=$?
+    # 同步变更文件
+    echo -e "\033[1;34m[SYNC] 开始增量同步...\033[0m"
+    declare -a rsync_opts=(
+        "${base_rsync_opts[@]}"
+        -avz
+        --files-from="$temp_file_list"
+    )
 
-    # 清理临时文件
-    rm -f "$temp_file_list"
-
-    # 显示rsync输出
-    echo "$rsync_output"
-
-    # 检查失败情况
-    ((ret != 0)) && handle_rsync_error "$rsync_output" "$ret"
-
-    # 设置权限
-    echo -e "\033[1;34m设置文件权限...\033[1;0m"
-    while IFS= read -r file; do
-        if [ -n "$file" ]; then
-            dir=$(dirname "$REMOTE_DIR/$file")
-            ssh_cmd="chmod 755 \"$dir\" 2>/dev/null; \
-                    [ -f \"$REMOTE_DIR/$file\" ] && chmod 644 \"$REMOTE_DIR/$file\" 2>/dev/null; \
-                    chown www:www \"$REMOTE_DIR/$file\" 2>/dev/null"
-            
-            if ! ssh -o ControlPath="~/.ssh/controlmasters/%r@%h:%p" -p "$PORT" "$REMOTE_USER@$REMOTE_IP" "$ssh_cmd"; then
-                echo -e "\033[1;31m警告: 无法设置文件 $file 的权限\033[1;0m"
-            fi
-        fi
-    done <<< "$files"
-
+    if rsync_output=$(rsync "${rsync_opts[@]}" \
+        "$LOCAL_DIR/" "$REMOTE_USER@$REMOTE_IP:$REMOTE_DIR/" 2>&1); then
+        echo "$rsync_output"
+    else
+        echo "$rsync_output"
+        handle_rsync_error "$rsync_output" $?
+    fi
 fi
+
+# 统一的权限设置逻辑
+echo -e "\033[1;34m[PERM] 设置权限...\033[0m"
+ssh_cmd="cd '$REMOTE_DIR' && {
+    find . -type d -exec chmod 755 {} + &
+    find . -type f $special_perm -exec chmod 644 {} + &
+    wait
+    find . $special_perm -exec chown www:www {} +
+}"
+
+if ! ssh -o ControlPath="~/.ssh/controlmasters/%r@%h:%p" \
+        -p "$PORT" \
+        "$REMOTE_USER@$REMOTE_IP" \
+        "$ssh_cmd"; then
+    echo -e "\033[1;31m[ERROR] 权限设置失败\033[0m" >&2
+    switch_back 1
+fi
+
 echo -e "\033[1;32m同步完成\033[1;0m"
 timer_end "rsync同步"
 
