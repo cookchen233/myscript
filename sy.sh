@@ -12,6 +12,47 @@
 # 第一次合并到 test 分支: sy test -m "PR-444: 这是一个需求" -m "消息内容"
 # 第二次: sy test -ma "又修改了点东西"
 
+# 定义计时函数，支持多个计时器
+timer_start() {
+    local timer_name=${1:-"总"}
+    # macOS 使用 md5 而不是 md5sum
+    local safe_name=$(echo "$timer_name" | md5)
+    if [[ "$(uname)" == "Darwin" ]]; then
+        eval "timer_${safe_name}=$(perl -MTime::HiRes=time -e 'printf "%.3f\n", time')"
+    else
+        eval "timer_${safe_name}=$(date +%s.%N)"
+    fi
+}
+
+timer_end() {
+    local timer_name=${1:-"总"}
+    local safe_name=$(echo "$timer_name" | md5)
+    local start_var="timer_${safe_name}"
+    local start_time=${!start_var}
+    
+    if [[ -z "$start_time" ]]; then
+        echo "错误: 计时器 '${timer_name}' 未启动" >&2
+        return 1
+    fi
+    
+    if [[ "$(uname)" == "Darwin" ]]; then
+        end_time=$(perl -MTime::HiRes=time -e 'printf "%.3f\n", time')
+    else
+        end_time=$(date +%s.%N)
+    fi
+    
+    execution_time=$(printf "%.2f" $(echo "$end_time - $start_time" | bc))
+    echo "${timer_name}耗时: ${execution_time}s"
+    
+    unset "$start_var"
+}
+
+timer_start
+
+# 获取当前脚本文件的最后修改时间
+version=$(date -r "$0" "+%Y%m%d")
+echo -e "\033[1;34mVersion: $version \033[1;0m\n"
+
 # validate branch
 if ! branch=$(git branch --show-current); then
   echo -e "\033[1;31m仓库信息异常, 请检查\033[1;0m"
@@ -71,22 +112,47 @@ if [[ "$branch" == "$target" ]]; then
   exit 1
 fi
 
-# use the last commit subject if -m is not specified
+# 如果没有指定 -m，则使用最后一次提交信息
 if [ ${#messages[@]} -eq 0 ]; then
   default_branch=$( \
     git show-ref --verify --quiet refs/heads/main && echo "main" || \
     git show-ref --verify --quiet refs/heads/master && echo "master" || \
     git ls-remote --heads origin main 2>/dev/null | grep -q main && echo "main" || \
     echo "master")
-  messages+=("$(git log --pretty=format:'%s' -1 origin/"${default_branch}".. || git rev-parse --abbrev-ref HEAD || echo "Update")")
+  messages+=("$(git log --pretty=format:'%s' -1 origin/"${default_branch}" || git rev-parse --abbrev-ref HEAD || echo "Update")")
+  echo -e "\033[1;34m没有指定 -m 参数, 将使用最后一次提交信息\033[1;0m"
 fi
 
+# 追加额外信息
 if [[ -n "$message_append" ]]; then
-  messages+=("$message_append")
+    messages+=("$message_append")
 fi
+
+# 合并消息
 messages_str=$(printf "%s\n\n\n" "${messages[@]}")
 messages_str="${messages_str%"$'\n\n\n'"}"
 messages_str=${messages_str:-"脚本自动提交"}
+
+# switch back to the task branch
+check_back() {
+  local exit_code="${1:-0}"
+
+  echo -e "\033[1;34m切回到 ${branch}\033[1;0m"
+  if ! git checkout "$branch"; then
+    echo -e "\033[1;31m切换分支失败\033[1;0m"
+    exit 1
+  fi
+
+  if $has_remote_branch; then
+    echo -e "\033[1;34m删除本地分支 ${target}\033[1;0m"
+    git branch -D "$target"
+    git fetch --all && git fetch -p origin
+  fi
+
+  timer_end
+  
+  exit "$exit_code"
+}
 
 # commit
 echo -e "\033[1;34m提交 '$messages_str' ...\033[1;0m"
@@ -106,6 +172,7 @@ has_remote_branch=$(git ls-remote --heads origin "$target" | grep -q . && echo t
 echo -e "\033[1;34m切换到 $target \033[1;0m"
 if $has_remote_branch; then
     echo -e "\033[1;34m检测到远程分支 $target \033[1;0m"
+    echo -e "\033[1;34m删除本地分支, 获取最新远程分支 $target \033[1;0m"
     git branch -D "$target" 2>/dev/null || true  # 删除本地分支如果存在
     git fetch origin "$target"
     git checkout "$target"
@@ -124,9 +191,10 @@ fi
 echo -e "\033[1;34m合并 $branch 到 ${target}\033[1;0m"
 if ! git merge "$branch" --no-ff --allow-unrelated-histories -m "$messages_str"; then
   echo -e "\033[1;31m合并失败, 请检查\033[1;0m"
-  exit 1
+  check_back 1
 fi
 
+timer_start "git推送"
 # push
 if $has_remote_branch; then
   echo -e "\033[1;34m推送 $target ...\033[1;0m"
@@ -134,15 +202,17 @@ if $has_remote_branch; then
   for ((attempt = 1; attempt <= max_attempts; attempt++)); do
     if git push; then
       break
-    elif [ $attempt -ge $max_attempts ]; then
+    elif [ "$attempt" -ge "$max_attempts" ]; then
       echo -e "\033[1;31m推送失败, 请手动重试push命令\033[1;0m"
-      exit 1
+      check_back 1
     fi
   done
 else
   echo -e "\033[1;33m未检测到远程仓库，跳过推送步骤\033[0m"
 fi
+timer_end "git推送"
 
+timer_start "rsync同步"
 #执行yzl脚本#########################################################
 HOME_WORK_PATH=$(pwd)
 SERVER_HOME_WORK_PATH="/www/wwwroot/" #服务器基础目录
@@ -159,7 +229,7 @@ json_file_name="sync_${target}.json"
   _ROOT=$(jq -r '.root' "${json_file_name}")
 } || {
   echo -e "\033[1;31m请添加配置文件 sync_${target}.json\033[1;0m"
-  exit
+  check_back 1
 }
 
 if [ "$_ROOT" != null ]; then
@@ -174,8 +244,6 @@ fi
 LOCAL_DIR=$HOME_WORK_PATH$PUSH_PATH
 # 服务器目录
 REMOTE_DIR=$SERVER_HOME_WORK_PATH$TO_PATH
-
-echo 'v2.4'
 
 if [ "$only_diff" != true ]; then
   # read -p "是否要进行全量同步？(将覆盖服务器所有文件, 请注意某些文件对服务器的影响, 如 .env, /runtime, /node_modules, /logs 等) (y/n): " choice
@@ -211,7 +279,6 @@ if [ "$only_diff" != true ]; then
       "tmp.drivedownload"
       "**/*.log"
       "**/*.pid"
-
     )
 
     # 构建 rsync 的 exclude 参数
@@ -220,27 +287,51 @@ if [ "$only_diff" != true ]; then
       exclude_params="$exclude_params --exclude='$item'"
     done
 
-    echo -e "\033[1;34m正在同步所有文件: \n$LOCAL_DIR => $REMOTE_DIR\033[1;0m"
+    # 测试 SSH 连接
+    # if ! ssh -p "$PORT" "$REMOTE_USER@$REMOTE_IP" "exit" 2>/dev/null; then
+    #   echo -e "\033[1;31mSSH连接失败: 无法连接到远程服务器 $REMOTE_USER@$REMOTE_IP:$PORT\033[1;0m"
+    #   check_back 1
+    # fi
 
-    # rsync 同步
-    eval "rsync -avzP --rsh=\"ssh -p $PORT\" --no-perms --no-owner --no-group $exclude_params \"$LOCAL_DIR\" \"$REMOTE_USER@$REMOTE_IP:$REMOTE_DIR\""
+    # rsync 同步文件
+    echo -e "\033[1;34m同步所有文件: \n$LOCAL_DIR => $REMOTE_DIR\033[1;0m"
+    rsync_output=$(eval "rsync -avzP --rsh=\"ssh -p $PORT\" --no-perms --no-owner --no-group $exclude_params \"$LOCAL_DIR\" \"$REMOTE_USER@$REMOTE_IP:$REMOTE_DIR\"" 2>&1)
+    ret=$?
 
-    # 构建 find 命令的条件（只针对文件的排除，目录不需要包含在权限设置中）
+    # 始终显示 rsync 的输出
+    echo "$rsync_output"
+
+    # 仅在失败时显示错误信息
+    ((ret != 0)) && {
+      if echo "$rsync_output" | grep -q "Connection refused"; then
+        echo -e "\033[1;31mrsync同步失败: SSH连接被拒绝，请检查:\n\
+    1. SSH连接信息(用户名/IP/端口)是否正确\n\
+    2. 目标服务器SSH服务是否正常运行\n\
+    3. 防火墙是否允许该端口连接\033[1;0m"
+      else
+        echo -e "\033[1;31mrsync同步失败: 文件传输过程中发生错误\033[1;0m"
+      fi
+      check_back 1
+    }
+
+    # 构建 find 命令的条件
     find_conditions=""
     for item in "${exclude_items[@]}"; do
-      # 只处理文件（不以斜杠结尾的项目）
       if [[ ! $item =~ /$ ]]; then
         find_conditions="$find_conditions ! -name '$item'"
       fi
     done
 
-    # 设置权限
-    ssh -p "$PORT" "$REMOTE_USER"@"$REMOTE_IP" "find $REMOTE_DIR -type d -exec chmod 755 {} + ; find $REMOTE_DIR -type f $find_conditions -exec chmod 644 {} + ; find $REMOTE_DIR $find_conditions -exec chown www:www {} +"
+    # 设置权限并捕获错误
+    if ! ssh -p "$PORT" "$REMOTE_USER@$REMOTE_IP" "find $REMOTE_DIR -type d -exec chmod 755 {} + ; find $REMOTE_DIR -type f $find_conditions -exec chmod 644 {} + ; find $REMOTE_DIR $find_conditions -exec chown www:www {} +"; then
+      echo -e "\033[1;31m权限设置失败: 无法更改文件权限或所有者\033[1;0m"
+      check_back 1
+    fi
 
-    echo -e "\033[1;34m已同步所有文件\033[1;0m"
   else
     echo -e "\033[1;31m已放弃同步\033[1;0m"
   fi
+
 else
   # 获取所有改变的文件列表
   files=$(git diff --name-only HEAD~1...HEAD)
@@ -281,13 +372,6 @@ else
   fi
 fi
 #end################################################################
+timer_end "rsync同步"
 
-# switch back to the task branch
-echo -e "\033[1;34m切回到 ${branch}\033[1;0m"
-git checkout "$branch"
-if $has_remote_branch; then
-  git branch -D "$target"
-  git fetch --all && git fetch -p origin
-fi
-
-exit $?
+check_back 0
