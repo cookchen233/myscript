@@ -102,9 +102,9 @@ read_config() {
 # rsync同步函数
 do_rsync() {
     local target=$1
-    local only_diff=$2
+    local is_all=$2
     local branch_for_diff=$3
-
+    
     timer_start "rsync同步"
 
     HOME_WORK_PATH=$(pwd)
@@ -139,7 +139,7 @@ do_rsync() {
         --no-whole-file
     )
 
-    if [ "$only_diff" != true ]; then
+    if [ "$is_all" == true ]; then
         # 全量同步逻辑
         exclude_items=(
             ".user.ini"
@@ -187,26 +187,37 @@ do_rsync() {
             find '$REMOTE_DIR' -type f ! -name '.user.ini' -exec chmod 644 {} + &
             wait
             find '$REMOTE_DIR' ! -name '.user.ini' -exec chown www:www {} +"
+
     else
         # 差异同步逻辑
         if files=$(git diff --name-only HEAD~1...HEAD) && [ -n "$files" ]; then
-            temp_file_list=$(mktemp)
-            echo "$files" > "$temp_file_list"
+            echo "检测到以下文件变更:"
+            echo "$files"
+            # read -p "是否要同步这些变更？[Y/n]: " choice
+            choice="y"
+            if [ -z "$choice" ] || [ "$choice" = "y" ] || [ "$choice" = "Y" ]; then
+                temp_file_list=$(mktemp)
+                echo "$files" > "$temp_file_list"
 
-            if ! rsync "${RSYNC_OPTS[@]}" --files-from="$temp_file_list" \
-                "$LOCAL_DIR" "$REMOTE_USER@$REMOTE_IP:$REMOTE_DIR"; then
+                if ! rsync "${RSYNC_OPTS[@]}" --files-from="$temp_file_list" \
+                    "$LOCAL_DIR" "$REMOTE_USER@$REMOTE_IP:$REMOTE_DIR"; then
+                    rm -f "$temp_file_list"
+                    echo "1" > "$SYNC_STATUS_FILE"
+                    return 1
+                fi
+
                 rm -f "$temp_file_list"
+
+                ssh -o ControlPath="$SSH_CONTROL_PATH" -p "$PORT" "$REMOTE_USER@$REMOTE_IP" "
+                    find '$REMOTE_DIR' -type d -exec chmod 755 {} + &
+                    find '$REMOTE_DIR' -type f ! -name '.user.ini' -exec chmod 644 {} + &
+                    wait
+                    find '$REMOTE_DIR' ! -name '.user.ini' -exec chown www:www {} +"
+            else
+                echo -e "\033[1;31m已放弃同步\033[1;0m"
                 echo "1" > "$SYNC_STATUS_FILE"
                 return 1
             fi
-
-            rm -f "$temp_file_list"
-
-            ssh -o ControlPath="$SSH_CONTROL_PATH" -p "$PORT" "$REMOTE_USER@$REMOTE_IP" "
-                find '$REMOTE_DIR' -type d -exec chmod 755 {} + &
-                find '$REMOTE_DIR' -type f ! -name '.user.ini' -exec chmod 644 {} + &
-                wait
-                find '$REMOTE_DIR' ! -name '.user.ini' -exec chown www:www {} +"
         fi
     fi
 
@@ -248,6 +259,24 @@ do_git_operations() {
     timer_end "git操作"
 }
 
+# 切回原分支的函数
+switch_back() {
+    local original_branch=$1
+    local target_branch=$2
+    local has_remote=$3
+    
+    echo -e "\033[1;34m切回到 ${original_branch}\033[1;0m"
+    if ! git checkout "$original_branch"; then
+        echo -e "\033[1;31m切换分支失败\033[1;0m"
+        return 1
+    fi
+    
+    if $has_remote; then
+        echo -e "\033[1;34m删除本地分支 ${target_branch}\033[1;0m"
+        git branch -D "$target_branch"
+    fi
+}
+
 main() {
     timer_start
 
@@ -272,14 +301,14 @@ main() {
     target=""
     messages=()
     message_append=""
-    only_diff=false
+    is_all=false
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -t) target="$2"; shift 2 ;;
             -m) messages+=("$2"); shift 2 ;;
             -ma) message_append="$2"; shift 2 ;;
-            diff) only_diff=true; shift ;;
+            all) is_all=true; shift ;;
             *)
                 if [ -z "$target" ]; then
                     target="$1"
@@ -343,6 +372,7 @@ main() {
 
     # 切换目标分支
     echo -e "\033[1;34m切换到 $target \033[1;0m"
+    branch_switched=false
     if $has_remote_branch; then
         echo -e "\033[1;34m检测到远程分支 $target \033[1;0m"
         git branch -D "$target" 2>/dev/null || true
@@ -350,14 +380,26 @@ main() {
             echo -e "\033[1;31m切换分支失败\033[1;0m"
             return 1
         fi
+        branch_switched=true
     else
         if git show-ref --verify --quiet "refs/heads/$target"; then
             if ! git checkout "$target"; then
                 echo -e "\033[1;31m切换分支失败\033[1;0m"
                 return 1
             fi
+            branch_switched=true
         else
             echo -e "\033[1;31m本地和远程都没有找到该分支: $target\033[1;0m"
+            return 1
+        fi
+    fi
+
+    # 先进行用户确认
+    if [ "$is_all" == true ]; then
+        read -p "是否要进行全量同步？(将覆盖服务器所有文件, 请注意某些文件对服务器的影响, 如 .env, /runtime, /node_modules, /logs 等) [y/n]: " choice
+        if ! { [ -z "$choice" ] || [ "$choice" = "y" ] || [ "$choice" = "Y" ]; }; then
+            echo -e "\033[1;31m已放弃同步\033[1;0m"
+            $branch_switched && switch_back "$branch" "$target" "$has_remote_branch"
             return 1
         fi
     fi
@@ -366,7 +408,7 @@ main() {
     do_git_operations "$target" "$branch" "$messages_str" "$has_remote_branch" &
     GIT_PID=$!
 
-    do_rsync "$target" "$only_diff" "$branch" &
+    do_rsync "$target" "$is_all" "$branch" &
     RSYNC_PID=$!
 
     wait $GIT_PID
@@ -376,22 +418,12 @@ main() {
 
     if [ "$git_status" != "0" ] || [ "$sync_status" != "0" ]; then
         echo -e "\033[1;31m操作失败\033[1;0m"
-        git checkout "$branch"
-        $has_remote_branch && git branch -D "$target"
+        $branch_switched && switch_back "$branch" "$target" "$has_remote_branch"
         return 1
     fi
 
-    echo -e "\033[1;34m切回到 ${branch}\033[1;0m"
-    if ! git checkout "$branch"; then
-        echo -e "\033[1;31m切换分支失败\033[1;0m"
-        return 1
-    fi
-
-    if $has_remote_branch; then
-        echo -e "\033[1;34m删除本地分支 ${target}\033[1;0m"
-        git branch -D "$target"
-        git fetch -p origin &
-    fi
+    # 成功后的切回
+    $branch_switched && switch_back "$branch" "$target" "$has_remote_branch"
 
     timer_end
     return 0

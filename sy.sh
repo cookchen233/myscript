@@ -111,7 +111,7 @@ esac
 target=""
 messages=()
 message_append=""
-only_diff=false
+is_all=false
 
 # process parameters
 while [[ $# -gt 0 ]]; do
@@ -128,8 +128,8 @@ while [[ $# -gt 0 ]]; do
     message_append="$2"
     shift 2
     ;;
-  diff)
-    only_diff=true
+  all)
+    is_all=true
     shift
     ;;
   *)
@@ -182,7 +182,7 @@ messages_str="${messages_str%"$'\n\n\n'"}"
 messages_str=${messages_str:-"脚本自动提交"}
 
 # switch back to the task branch
-checkout_back() {
+switch_back() {
   local exit_code="${1:-0}"
 
   echo -e "\033[1;34m切回到 ${branch}\033[1;0m"
@@ -246,7 +246,7 @@ fi
 echo -e "\033[1;34m合并 $branch 到 ${target}\033[1;0m"
 if ! git merge "$branch" --no-ff --allow-unrelated-histories -m "$messages_str"; then
   echo -e "\033[1;31m合并失败, 请检查\033[1;0m"
-  checkout_back 1
+  switch_back 1
 fi
 
 timer_start "git推送"
@@ -259,7 +259,7 @@ if $has_remote_branch; then
       break
     elif [ "$attempt" -ge "$max_attempts" ]; then
       echo -e "\033[1;31m推送失败, 请手动重试push命令\033[1;0m"
-      checkout_back 1
+      switch_back 1
     fi
   done
 else
@@ -276,7 +276,7 @@ PORT=22
 # 读取配置文件
 json_file_name="sync_${target}.json"
 if ! read_config "$json_file_name"; then
-    checkout_back 1
+    switch_back 1
 fi
 
 if [ "$_ROOT" != null ]; then
@@ -295,10 +295,9 @@ REMOTE_DIR=$SERVER_HOME_WORK_PATH$TO_PATH
 # 设置SSH控制主连接
 setup_ssh_controlmaster "$REMOTE_USER" "$REMOTE_IP" "$PORT"
 
-if [ "$only_diff" != true ]; then
-  # read -p "是否要进行全量同步？(将覆盖服务器所有文件, 请注意某些文件对服务器的影响, 如 .env, /runtime, /node_modules, /logs 等) (y/n): " choice
-  choice="y"
-  if [ "$choice" == "y" ]; then
+if [ "$is_all" == true ]; then
+  read -p "是否要进行全量同步？(将覆盖服务器所有文件, 请注意某些文件对服务器的影响, 如 .env, /runtime, /node_modules, /logs 等) [y/n]: " choice
+  if [ -z "$choice" ] || [ "$choice" = "y" ] || [ "$choice" = "Y" ]; then
     # 定义需要排除的文件和目录
     exclude_items=(
       ".user.ini"
@@ -361,7 +360,7 @@ if [ "$only_diff" != true ]; then
       else
         echo -e "\033[1;31mrsync同步失败: 文件传输过程中发生错误\033[1;0m"
       fi
-      checkout_back 1
+      switch_back 1
     }
 
     # 构建 find 命令的条件
@@ -375,11 +374,12 @@ if [ "$only_diff" != true ]; then
     # 设置权限并捕获错误，使用SSH控制主连接
     if ! ssh -o ControlPath="~/.ssh/controlmasters/%r@%h:%p" -p "$PORT" "$REMOTE_USER@$REMOTE_IP" "find $REMOTE_DIR -type d -exec chmod 755 {} + ; find $REMOTE_DIR -type f $find_conditions -exec chmod 644 {} + ; find $REMOTE_DIR $find_conditions -exec chown www:www {} +"; then
       echo -e "\033[1;31m权限设置失败: 无法更改文件权限或所有者\033[1;0m"
-      checkout_back 1
+      switch_back 1
     fi
 
   else
     echo -e "\033[1;31m已放弃同步\033[1;0m"
+    switch_back 1
   fi
 
 else
@@ -392,8 +392,7 @@ else
   echo "--------------------------------"
   # read -p "是否同步这些文件到服务器？(y/n): " choice
   choice="y"
-
-  if [ "$choice" == "y" ]; then
+  if [ -z "$choice" ] || [ "$choice" = "y" ] || [ "$choice" = "Y" ]; then
     # 创建临时文件列表
     temp_file_list=$(mktemp)
     echo "$files" > "$temp_file_list"
@@ -410,10 +409,11 @@ else
     ssh -o ControlPath="~/.ssh/controlmasters/%r@%h:%p" -p "$PORT" "$REMOTE_USER@$REMOTE_IP" \
         "find $REMOTE_DIR -type d -exec chmod 755 {} + ; find $REMOTE_DIR -type f ! -name '.user.ini' -exec chmod 644 {} + ; find $REMOTE_DIR ! -name '.user.ini' -exec chown www:www {} +"
   else
-    echo "已放弃同步"
+    echo -e "\033[1;31m已放弃同步\033[1;0m"
+    switch_back 1
   fi
 fi
 
 timer_end "rsync同步"
 
-checkout_back 0
+switch_back 0
