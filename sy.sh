@@ -386,33 +386,35 @@ if [ "$is_all" == true ]; then
 
 else
   # 获取所有改变的文件列表
-  files=$(git diff --name-only HEAD~1...HEAD)
+  if files=$(git diff --name-only HEAD~1...HEAD) && [ -n "$files" ]; then
+    echo "待同步的文件列表"
+    echo "--------------------------------"
+    echo -e "$files"
+    echo "--------------------------------"
+    # read -p "是否同步这些文件到服务器？(y/n): " choice
+    choice="y"
+    if [ -z "$choice" ] || [ "$choice" = "y" ] || [ "$choice" = "Y" ]; then
+      # 创建临时文件列表
+      temp_file_list=$(mktemp)
+      echo "$files" > "$temp_file_list"
 
-  echo "待同步的文件列表"
-  echo "--------------------------------"
-  echo -e "$files"
-  echo "--------------------------------"
-  # read -p "是否同步这些文件到服务器？(y/n): " choice
-  choice="y"
-  if [ -z "$choice" ] || [ "$choice" = "y" ] || [ "$choice" = "Y" ]; then
-    # 创建临时文件列表
-    temp_file_list=$(mktemp)
-    echo "$files" > "$temp_file_list"
+      # 使用rsync的--files-from选项批量同步文件
+      rsync -avz --rsh="ssh -p $PORT -o ControlPath=~/.ssh/controlmasters/%r@%h:%p" \
+            --no-perms --no-owner --no-group \
+            --files-from="$temp_file_list" \
+            "$LOCAL_DIR" "$REMOTE_USER@$REMOTE_IP:$REMOTE_DIR"
 
-    # 使用rsync的--files-from选项批量同步文件
-    rsync -avz --rsh="ssh -p $PORT -o ControlPath=~/.ssh/controlmasters/%r@%h:%p" \
-          --no-perms --no-owner --no-group \
-          --files-from="$temp_file_list" \
-          "$LOCAL_DIR" "$REMOTE_USER@$REMOTE_IP:$REMOTE_DIR"
+      rm -f "$temp_file_list"
 
-    rm -f "$temp_file_list"
-
-    # 设置权限，但排除 .user.ini 文件
-    ssh -o ControlPath="~/.ssh/controlmasters/%r@%h:%p" -p "$PORT" "$REMOTE_USER@$REMOTE_IP" \
-        "find $REMOTE_DIR -type d -exec chmod 755 {} + ; find $REMOTE_DIR -type f ! -name '.user.ini' -exec chmod 644 {} + ; find $REMOTE_DIR ! -name '.user.ini' -exec chown www:www {} +"
+      # 设置权限，但排除 .user.ini 文件
+      ssh -o ControlPath="~/.ssh/controlmasters/%r@%h:%p" -p "$PORT" "$REMOTE_USER@$REMOTE_IP" \
+          "find $REMOTE_DIR -type d -exec chmod 755 {} + ; find $REMOTE_DIR -type f ! -name '.user.ini' -exec chmod 644 {} + ; find $REMOTE_DIR ! -name '.user.ini' -exec chown www:www {} +"
+    else
+      echo -e "\033[1;31m已放弃同步\033[1;0m"
+      switch_back 1
+    fi
   else
-    echo -e "\033[1;31m已放弃同步\033[1;0m"
-    switch_back 1
+    echo -e "\033[1;34m[SYNC] 没有检测到变更，跳过同步\033[1;0m"
   fi
 fi
 

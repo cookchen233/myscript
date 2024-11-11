@@ -194,8 +194,10 @@ do_rsync() {
     else
         # 差异同步逻辑
         if files=$(git diff --name-only HEAD~1...HEAD) && [ -n "$files" ]; then
-            echo -e "\033[1;34m[SYNC] 检测到以下文件变更:\033[1;0m"
-            echo "$files"
+            echo "待同步的文件列表"
+            echo "--------------------------------"
+            echo -e "$files"
+            echo "--------------------------------"
             
             temp_file_list=$(mktemp)
             echo "$files" > "$temp_file_list"
@@ -215,6 +217,8 @@ do_rsync() {
                 find '$REMOTE_DIR' -type f ! -name '.user.ini' -exec chmod 644 {} + &
                 wait
                 find '$REMOTE_DIR' ! -name '.user.ini' -exec chown www:www {} +"
+        else
+            echo -e "\033[1;34m[SYNC] 没有检测到变更，跳过同步\033[1;0m"
         fi
     fi
 
@@ -359,12 +363,21 @@ main() {
     messages_str=${messages_str:-"脚本自动提交"}
 
     # 提交当前更改
+    # echo -e "\033[1;34m提交 '$messages_str' ...\033[1;0m"
+    # if ! git diff --quiet HEAD; then
+    #     git add --all
+    #     if ! git commit -m "$messages_str"; then
+    #         echo -e "\033[1;31m提交失败\033[1;0m"
+    #         return 1
+    #     fi
+    # fi
     echo -e "\033[1;34m提交 '$messages_str' ...\033[1;0m"
-    if ! git diff --quiet HEAD; then
-        git add --all
-        if ! git commit -m "$messages_str"; then
-            echo -e "\033[1;31m提交失败\033[1;0m"
-            return 1
+    git_status=$(git -c color.status=always status)
+    if [[ $git_status != *"nothing to commit"* && $git_status != *"无文件要提交，干净的工作区"* ]]; then
+        echo "$git_status"
+        if ! (git add --all && git commit -m "$messages_str"); then
+            echo -e "\033[1;31m提交失败, 请检查\033[1;0m"
+            exit 1
         fi
     fi
 
