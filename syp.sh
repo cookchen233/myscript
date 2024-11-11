@@ -134,7 +134,6 @@ do_rsync() {
         --no-group
         --compress-level=9
         --stats
-        --delete
         --numeric-ids
         --inplace
         --no-whole-file
