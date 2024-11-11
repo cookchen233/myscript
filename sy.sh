@@ -67,17 +67,19 @@ read_config() {
     local json_file_name=$1
     local cache_file="$CACHE_DIR/${json_file_name}.cache"
     
-    # 如果缓存文件不存在或配置文件比缓存新，则重新读取
-    if [[ ! -f "$cache_file" ]] || [[ "$json_file_name" -nt "$cache_file" ]]; then
-        {
-            jq -r '.path,.to_path,.ip,.user,.port,.root' "$json_file_name" > "$cache_file"
-        } || {
-            echo -e "\033[1;31m请添加配置文件 $json_file_name\033[1;0m"
-            return 1
-        }
+    if [[ ! -f "$json_file_name" ]]; then
+        echo -e "\033[1;31m配置文件不存在: $json_file_name\033[1;0m"
+        return 1
     fi
     
-    # 读取缓存的配置
+    if [[ ! -f "$cache_file" ]] || [[ "$json_file_name" -nt "$cache_file" ]]; then
+        if ! jq -r '.path,.to_path,.ip,.user,.port,.root' "$json_file_name" > "$cache_file.tmp" 2>/dev/null; then
+            echo -e "\033[1;31m配置文件格式错误: $json_file_name\033[1;0m"
+            return 1
+        fi
+        mv "$cache_file.tmp" "$cache_file"
+    fi
+    
     {
         read -r PUSH_PATH
         read -r TO_PATH

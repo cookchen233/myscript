@@ -12,9 +12,11 @@ mkdir -p "$CACHE_DIR"
 # 创建临时文件用于同步状态
 SYNC_STATUS_FILE=$(mktemp)
 GIT_STATUS_FILE=$(mktemp)
+GIT_ERROR_FILE=$(mktemp)
+RSYNC_ERROR_FILE=$(mktemp)
 
 cleanup() {
-    rm -f "$SYNC_STATUS_FILE" "$GIT_STATUS_FILE"
+    rm -f "$SYNC_STATUS_FILE" "$GIT_STATUS_FILE" "$GIT_ERROR_FILE" "$RSYNC_ERROR_FILE"
     if [[ -n "$REMOTE_USER" && -n "$REMOTE_IP" && -n "$PORT" ]]; then
         ssh -O stop -o ControlPath="$SSH_CONTROL_PATH" -p "$PORT" "$REMOTE_USER@$REMOTE_IP" 2>/dev/null
     fi
@@ -79,9 +81,14 @@ read_config() {
     local json_file_name=$1
     local cache_file="$CACHE_DIR/${json_file_name}.cache"
     
+    if [[ ! -f "$json_file_name" ]]; then
+        echo -e "\033[1;31m配置文件不存在: $json_file_name\033[1;0m"
+        return 1
+    fi
+    
     if [[ ! -f "$cache_file" ]] || [[ "$json_file_name" -nt "$cache_file" ]]; then
         if ! jq -r '.path,.to_path,.ip,.user,.port,.root' "$json_file_name" > "$cache_file.tmp" 2>/dev/null; then
-            echo -e "\033[1;31m请添加配置文件 $json_file_name\033[1;0m"
+            echo -e "\033[1;31m配置文件格式错误: $json_file_name\033[1;0m"
             return 1
         fi
         mv "$cache_file.tmp" "$cache_file"
@@ -106,22 +113,17 @@ do_rsync() {
     local branch_for_diff=$3
     
     timer_start "rsync同步"
+    echo -e "\033[1;34m[SYNC] 开始同步...\033[1;0m"
 
     HOME_WORK_PATH=$(pwd)
     SERVER_HOME_WORK_PATH="/www/wwwroot/"
     PORT=22
 
-    json_file_name="sync_${target}.json"
-    if ! read_config "$json_file_name"; then
-        echo "1" > "$SYNC_STATUS_FILE"
-        return 1
-    fi
+    LOCAL_DIR=$HOME_WORK_PATH$PUSH_PATH
+    REMOTE_DIR=$SERVER_HOME_WORK_PATH$TO_PATH
 
     [[ "$_ROOT" != null ]] && SERVER_HOME_WORK_PATH=$_ROOT
     [[ "$_PORT" != null ]] && PORT=$_PORT
-
-    LOCAL_DIR=$HOME_WORK_PATH$PUSH_PATH
-    REMOTE_DIR=$SERVER_HOME_WORK_PATH$TO_PATH
 
     setup_ssh_controlmaster "$REMOTE_USER" "$REMOTE_IP" "$PORT"
 
@@ -177,6 +179,7 @@ do_rsync() {
         done
 
         if ! rsync "${RSYNC_OPTS[@]}" "$LOCAL_DIR" "$REMOTE_USER@$REMOTE_IP:$REMOTE_DIR"; then
+            echo -e "\033[1;31m[SYNC] 同步失败\033[1;0m" >&2
             echo "1" > "$SYNC_STATUS_FILE"
             return 1
         fi
@@ -191,33 +194,27 @@ do_rsync() {
     else
         # 差异同步逻辑
         if files=$(git diff --name-only HEAD~1...HEAD) && [ -n "$files" ]; then
-            echo "检测到以下文件变更:"
+            echo -e "\033[1;34m[SYNC] 检测到以下文件变更:\033[1;0m"
             echo "$files"
-            # read -p "是否要同步这些变更？[Y/n]: " choice
-            choice="y"
-            if [ -z "$choice" ] || [ "$choice" = "y" ] || [ "$choice" = "Y" ]; then
-                temp_file_list=$(mktemp)
-                echo "$files" > "$temp_file_list"
+            
+            temp_file_list=$(mktemp)
+            echo "$files" > "$temp_file_list"
 
-                if ! rsync "${RSYNC_OPTS[@]}" --files-from="$temp_file_list" \
-                    "$LOCAL_DIR" "$REMOTE_USER@$REMOTE_IP:$REMOTE_DIR"; then
-                    rm -f "$temp_file_list"
-                    echo "1" > "$SYNC_STATUS_FILE"
-                    return 1
-                fi
-
+            if ! rsync "${RSYNC_OPTS[@]}" --files-from="$temp_file_list" \
+                "$LOCAL_DIR" "$REMOTE_USER@$REMOTE_IP:$REMOTE_DIR"; then
                 rm -f "$temp_file_list"
-
-                ssh -o ControlPath="$SSH_CONTROL_PATH" -p "$PORT" "$REMOTE_USER@$REMOTE_IP" "
-                    find '$REMOTE_DIR' -type d -exec chmod 755 {} + &
-                    find '$REMOTE_DIR' -type f ! -name '.user.ini' -exec chmod 644 {} + &
-                    wait
-                    find '$REMOTE_DIR' ! -name '.user.ini' -exec chown www:www {} +"
-            else
-                echo -e "\033[1;31m已放弃同步\033[1;0m"
+                echo -e "\033[1;31m[SYNC] 同步失败\033[1;0m" >&2
                 echo "1" > "$SYNC_STATUS_FILE"
                 return 1
             fi
+
+            rm -f "$temp_file_list"
+
+            ssh -o ControlPath="$SSH_CONTROL_PATH" -p "$PORT" "$REMOTE_USER@$REMOTE_IP" "
+                find '$REMOTE_DIR' -type d -exec chmod 755 {} + &
+                find '$REMOTE_DIR' -type f ! -name '.user.ini' -exec chmod 644 {} + &
+                wait
+                find '$REMOTE_DIR' ! -name '.user.ini' -exec chown www:www {} +"
         fi
     fi
 
@@ -235,24 +232,25 @@ do_git_operations() {
     timer_start "git操作"
 
     # merge
-    echo -e "\033[1;34m合并 $branch 到 ${target}\033[1;0m"
+    echo -e "\033[1;34m[GIT] 合并 $branch 到 ${target}\033[1;0m"
     if ! git merge "$branch" --no-ff --allow-unrelated-histories -m "$messages_str"; then
+        echo -e "\033[1;31m[GIT] 合并失败\033[1;0m" >&2
         echo "1" > "$GIT_STATUS_FILE"
         return 1
     fi
 
     # push
     if $has_remote_branch; then
-        echo -e "\033[1;34m推送 $target ...\033[1;0m"
+        echo -e "\033[1;34m[GIT] 推送 $target ...\033[1;0m"
         if ! git push --no-verify; then
             if ! git pull --rebase && ! git push --no-verify; then
-                echo -e "\033[1;31m推送失败\033[1;0m"
+                echo -e "\033[1;31m[GIT] 推送失败\033[1;0m" >&2
                 echo "1" > "$GIT_STATUS_FILE"
                 return 1
             fi
         fi
     else
-        echo -e "\033[1;33m未检测到远程分支，跳过推送步骤\033[0m"
+        echo -e "\033[1;33m[GIT] 未检测到远程分支，跳过推送步骤\033[0m"
     fi
 
     echo "0" > "$GIT_STATUS_FILE"
@@ -333,6 +331,12 @@ main() {
         return 1
     fi
 
+    # 提前检查配置文件
+    json_file_name="sync_${target}.json"
+    if ! read_config "$json_file_name"; then
+        return 1
+    fi
+
     # 后台预加载远程分支信息
     git fetch --all --prune &
     FETCH_PID=$!
@@ -396,7 +400,7 @@ main() {
 
     # 先进行用户确认
     if [ "$is_all" == true ]; then
-        read -p "是否要进行全量同步？(将覆盖服务器所有文件, 请注意某些文件对服务器的影响, 如 .env, /runtime, /node_modules, /logs 等) [y/n]: " choice
+        read -p "是否要进行全量同步？(将覆盖服务器所有文件，请注意某些文件对服务器的影响，如 .env, /runtime, /node_modules, /logs 等) [y/n]: " choice
         if ! { [ -z "$choice" ] || [ "$choice" = "y" ] || [ "$choice" = "Y" ]; }; then
             echo -e "\033[1;31m已放弃同步\033[1;0m"
             $branch_switched && switch_back "$branch" "$target" "$has_remote_branch"
@@ -405,16 +409,20 @@ main() {
     fi
 
     # 并行执行操作
-    do_git_operations "$target" "$branch" "$messages_str" "$has_remote_branch" &
+    do_git_operations "$target" "$branch" "$messages_str" "$has_remote_branch" 2>"$GIT_ERROR_FILE" &
     GIT_PID=$!
 
-    do_rsync "$target" "$is_all" "$branch" &
+    do_rsync "$target" "$is_all" "$branch" 2>"$RSYNC_ERROR_FILE" &
     RSYNC_PID=$!
 
     wait $GIT_PID
     git_status=$(<"$GIT_STATUS_FILE")
     wait $RSYNC_PID
     sync_status=$(<"$SYNC_STATUS_FILE")
+
+    # 显示收集到的错误信息
+    [[ -s "$GIT_ERROR_FILE" ]] && cat "$GIT_ERROR_FILE" >&2
+    [[ -s "$RSYNC_ERROR_FILE" ]] && cat "$RSYNC_ERROR_FILE" >&2
 
     if [ "$git_status" != "0" ] || [ "$sync_status" != "0" ]; then
         echo -e "\033[1;31m操作失败\033[1;0m"
