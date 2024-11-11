@@ -8,6 +8,9 @@
 # 如果没有 -m 参数, 默认取最后一次的消息主题
 # 如果已经合并过一次, 可使用 -ma 如: sy test -ma "消息内容2", 这将沿用上一次的消息主题
 
+export LC_ALL=C
+export LANG=C
+
 # 创建临时目录用于缓存
 CACHE_DIR="/tmp/sync_script_cache"
 mkdir -p "$CACHE_DIR"
