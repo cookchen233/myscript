@@ -49,7 +49,7 @@ class NotificationConfig:
         'smtp_user': os.getenv('NF_SMTP_USER', 'user@example.com'),
         'smtp_pass': os.getenv('NF_SMTP_PASS', 'password'),
         'mail_from': os.getenv('NF_MAIL_FROM', 'notification@example.com'),
-        'mail_to': os.getenv('NF_MAIL_TO', 'admin@example.com').split(','),
+        'mail_to': os.getenv('NF_MAIL_TO', 'admin@example.com').split(';'),
         
         # 声音
         'enable_sound': os.getenv('NF_ENABLE_SOUND', 'true').lower() == 'true',
