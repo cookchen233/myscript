@@ -1,0 +1,8 @@
+{
+  "path": "/",
+  "to_path": "/xx.com/",
+  "ip": "118.22.23.18",
+  "user": "root",
+  "port": 22,
+  "root": "/www/root/"
+}
