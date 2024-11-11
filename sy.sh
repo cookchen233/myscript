@@ -8,15 +8,30 @@
 # 如果没有 -m 参数, 默认取最后一次的消息主题
 # 如果已经合并过一次, 可使用 -ma 如: sy test -ma "消息内容2", 这将沿用上一次的消息主题
 
-# 示例:
-# 第一次合并到 test 分支: sy test -m "PR-444: 这是一个需求" -m "消息内容"
-# 第二次: sy test -ma "又修改了点东西"
+# 创建临时目录用于缓存
+CACHE_DIR="/tmp/sync_script_cache"
+mkdir -p "$CACHE_DIR"
+
+# SSH控制主连接
+setup_ssh_controlmaster() {
+    local remote_user=$1
+    local remote_ip=$2
+    local port=$3
+    
+    # 创建控制socket目录
+    mkdir -p ~/.ssh/controlmasters
+    
+    # 设置SSH控制主连接
+    ssh -nNf -o ControlMaster=yes \
+           -o ControlPath="~/.ssh/controlmasters/%r@%h:%p" \
+           -o ControlPersist=5m \
+           -p "$port" "$remote_user@$remote_ip"
+}
 
 # 定义计时函数，支持多个计时器
 timer_start() {
     local timer_name=${1:-"总"}
-    # macOS 使用 md5 而不是 md5sum
-    local safe_name=$(echo "$timer_name" | md5)
+    local safe_name=$(echo "$timer_name" | md5 2>/dev/null || echo "$timer_name" | md5sum | cut -d' ' -f1)
     if [[ "$(uname)" == "Darwin" ]]; then
         eval "timer_${safe_name}=$(perl -MTime::HiRes=time -e 'printf "%.3f\n", time')"
     else
@@ -26,7 +41,7 @@ timer_start() {
 
 timer_end() {
     local timer_name=${1:-"总"}
-    local safe_name=$(echo "$timer_name" | md5)
+    local safe_name=$(echo "$timer_name" | md5 2>/dev/null || echo "$timer_name" | md5sum | cut -d' ' -f1)
     local start_var="timer_${safe_name}"
     local start_time=${!start_var}
     
@@ -45,6 +60,34 @@ timer_end() {
     echo "${timer_name}耗时: ${execution_time}s"
     
     unset "$start_var"
+}
+
+# 缓存配置文件读取
+read_config() {
+    local json_file_name=$1
+    local cache_file="$CACHE_DIR/${json_file_name}.cache"
+    
+    # 如果缓存文件不存在或配置文件比缓存新，则重新读取
+    if [[ ! -f "$cache_file" ]] || [[ "$json_file_name" -nt "$cache_file" ]]; then
+        {
+            jq -r '.path,.to_path,.ip,.user,.port,.root' "$json_file_name" > "$cache_file"
+        } || {
+            echo -e "\033[1;31m请添加配置文件 $json_file_name\033[1;0m"
+            return 1
+        }
+    fi
+    
+    # 读取缓存的配置
+    {
+        read -r PUSH_PATH
+        read -r TO_PATH
+        read -r REMOTE_IP
+        read -r REMOTE_USER
+        read -r _PORT
+        read -r _ROOT
+    } < "$cache_file"
+    
+    return 0
 }
 
 timer_start
@@ -102,6 +145,7 @@ while [[ $# -gt 0 ]]; do
     ;;
   esac
 done
+
 if [ -z "$target" ]; then
   echo "错误: 目标分支参数是必需的 (第一个或 -t)"
   exit 1
@@ -111,6 +155,10 @@ if [[ "$branch" == "$target" ]]; then
   echo -e "\033[1;31m禁止直接推送分支\033[1;0m"
   exit 1
 fi
+
+# 后台预加载远程分支信息
+git fetch --all &
+FETCH_PID=$!
 
 # 如果没有指定 -m，则使用最后一次提交信息
 if [ ${#messages[@]} -eq 0 ]; then
@@ -146,7 +194,12 @@ checkout_back() {
   if $has_remote_branch; then
     echo -e "\033[1;34m删除本地分支 ${target}\033[1;0m"
     git branch -D "$target"
-    git fetch --all && git fetch -p origin
+    git fetch -p origin &  # 后台执行清理
+  fi
+
+  # 清理SSH控制主连接
+  if [[ -n "$REMOTE_USER" && -n "$REMOTE_IP" && -n "$PORT" ]]; then
+    ssh -O stop -o ControlPath="~/.ssh/controlmasters/%r@%h:%p" -p "$PORT" "$REMOTE_USER@$REMOTE_IP" 2>/dev/null
   fi
 
   timer_end
@@ -165,6 +218,9 @@ if [[ $git_status != *"nothing to commit"* && $git_status != *"无文件要提�
   fi
 fi
 
+# 等待fetch完成
+wait $FETCH_PID
+
 # 检查远程分支是否存在
 has_remote_branch=$(git ls-remote --heads origin "$target" | grep -q . && echo true || echo false)
 
@@ -174,7 +230,6 @@ if $has_remote_branch; then
     echo -e "\033[1;34m检测到远程分支 $target \033[1;0m"
     echo -e "\033[1;34m删除本地分支, 获取最新远程分支 $target \033[1;0m"
     git branch -D "$target" 2>/dev/null || true  # 删除本地分支如果存在
-    git fetch origin "$target"
     git checkout "$target"
 else
     echo -e "\033[1;34m远程分支 $target 不存在, 请注意本地代码的保管 \033[1;0m"
@@ -220,17 +275,9 @@ PORT=22
 
 # 读取配置文件
 json_file_name="sync_${target}.json"
-{
-  PUSH_PATH=$(jq -r '.path' "${json_file_name}")
-  TO_PATH=$(jq -r '.to_path' "${json_file_name}")
-  REMOTE_IP=$(jq -r '.ip' "${json_file_name}")
-  REMOTE_USER=$(jq -r '.user' "${json_file_name}")
-  _PORT=$(jq -r '.port' "${json_file_name}")
-  _ROOT=$(jq -r '.root' "${json_file_name}")
-} || {
-  echo -e "\033[1;31m请添加配置文件 sync_${target}.json\033[1;0m"
-  checkout_back 1
-}
+if ! read_config "$json_file_name"; then
+    checkout_back 1
+fi
 
 if [ "$_ROOT" != null ]; then
   SERVER_HOME_WORK_PATH=$_ROOT
@@ -244,6 +291,9 @@ fi
 LOCAL_DIR=$HOME_WORK_PATH$PUSH_PATH
 # 服务器目录
 REMOTE_DIR=$SERVER_HOME_WORK_PATH$TO_PATH
+
+# 设置SSH控制主连接
+setup_ssh_controlmaster "$REMOTE_USER" "$REMOTE_IP" "$PORT"
 
 if [ "$only_diff" != true ]; then
   # read -p "是否要进行全量同步？(将覆盖服务器所有文件, 请注意某些文件对服务器的影响, 如 .env, /runtime, /node_modules, /logs 等) (y/n): " choice
@@ -263,7 +313,7 @@ if [ "$only_diff" != true ]; then
       ".project"
       ".history"
       "Thumbs.db"
-      "log/" # 不加斜杠会排除log.*等所有文件
+      "log/"
       "logs/"
       "upload/"
       "uploads/"
@@ -287,15 +337,15 @@ if [ "$only_diff" != true ]; then
       exclude_params="$exclude_params --exclude='$item'"
     done
 
-    # 测试 SSH 连接
-    # if ! ssh -p "$PORT" "$REMOTE_USER@$REMOTE_IP" "exit" 2>/dev/null; then
-    #   echo -e "\033[1;31mSSH连接失败: 无法连接到远程服务器 $REMOTE_USER@$REMOTE_IP:$PORT\033[1;0m"
-    #   checkout_back 1
-    # fi
-
-    # rsync 同步文件
+    # rsync 同步文件，使用SSH控制主连接
     echo -e "\033[1;34m同步所有文件: \n$LOCAL_DIR => $REMOTE_DIR\033[1;0m"
-    rsync_output=$(eval "rsync -avzP --rsh=\"ssh -p $PORT\" --no-perms --no-owner --no-group $exclude_params \"$LOCAL_DIR\" \"$REMOTE_USER@$REMOTE_IP:$REMOTE_DIR\"" 2>&1)
+    rsync_output=$(eval "rsync -avzP \
+        --rsh=\"ssh -p $PORT -o ControlPath=~/.ssh/controlmasters/%r@%h:%p\" \
+        --no-perms --no-owner --no-group \
+        --compress-level=9 \
+        --stats \
+        $exclude_params \
+        \"$LOCAL_DIR\" \"$REMOTE_USER@$REMOTE_IP:$REMOTE_DIR\"" 2>&1)
     ret=$?
 
     # 始终显示 rsync 的输出
@@ -322,8 +372,8 @@ if [ "$only_diff" != true ]; then
       fi
     done
 
-    # 设置权限并捕获错误
-    if ! ssh -p "$PORT" "$REMOTE_USER@$REMOTE_IP" "find $REMOTE_DIR -type d -exec chmod 755 {} + ; find $REMOTE_DIR -type f $find_conditions -exec chmod 644 {} + ; find $REMOTE_DIR $find_conditions -exec chown www:www {} +"; then
+    # 设置权限并捕获错误，使用SSH控制主连接
+    if ! ssh -o ControlPath="~/.ssh/controlmasters/%r@%h:%p" -p "$PORT" "$REMOTE_USER@$REMOTE_IP" "find $REMOTE_DIR -type d -exec chmod 755 {} + ; find $REMOTE_DIR -type f $find_conditions -exec chmod 644 {} + ; find $REMOTE_DIR $find_conditions -exec chown www:www {} +"; then
       echo -e "\033[1;31m权限设置失败: 无法更改文件权限或所有者\033[1;0m"
       checkout_back 1
     fi
@@ -344,34 +394,26 @@ else
   choice="y"
 
   if [ "$choice" == "y" ]; then
-    for file in $files; do
-      # 拼接文件路径
-      FILE_TO_BACKUP="$LOCAL_DIR$file"
-      SERVER_FILE_TO_BACKUP="$REMOTE_DIR$file"
+    # 创建临时文件列表
+    temp_file_list=$(mktemp)
+    echo "$files" > "$temp_file_list"
 
-      # 确保远程目录存在
-      remote_dir=$(dirname "$SERVER_FILE_TO_BACKUP")
-      ssh -p "$PORT" "$REMOTE_USER"@"$REMOTE_IP" "mkdir -p '$remote_dir'"
+    # 使用rsync的--files-from选项批量同步文件
+    rsync -avz --rsh="ssh -p $PORT -o ControlPath=~/.ssh/controlmasters/%r@%h:%p" \
+          --no-perms --no-owner --no-group \
+          --files-from="$temp_file_list" \
+          "$LOCAL_DIR" "$REMOTE_USER@$REMOTE_IP:$REMOTE_DIR"
 
-      # 检查是否为 .user.ini 文件
-      if [[ "$file" == *".user.ini" ]]; then
-        echo "检测到 .user.ini 文件，跳过同步"
-        continue
-      else
-        # 使用rsync同步文件
-        rsync -avz --rsh="ssh -p $PORT" --no-perms --no-owner --no-group "$FILE_TO_BACKUP" "$REMOTE_USER@$REMOTE_IP:$SERVER_FILE_TO_BACKUP"
-      fi
-
-      echo "已同步文件：$FILE_TO_BACKUP => $SERVER_FILE_TO_BACKUP"
-    done
+    rm -f "$temp_file_list"
 
     # 设置权限，但排除 .user.ini 文件
-    ssh -p "$PORT" "$REMOTE_USER"@"$REMOTE_IP" "find $REMOTE_DIR -type d -exec chmod 755 {} + ; find $REMOTE_DIR -type f ! -name '.user.ini' -exec chmod 644 {} + ; find $REMOTE_DIR ! -name '.user.ini' -exec chown www:www {} +"
+    ssh -o ControlPath="~/.ssh/controlmasters/%r@%h:%p" -p "$PORT" "$REMOTE_USER@$REMOTE_IP" \
+        "find $REMOTE_DIR -type d -exec chmod 755 {} + ; find $REMOTE_DIR -type f ! -name '.user.ini' -exec chmod 644 {} + ; find $REMOTE_DIR ! -name '.user.ini' -exec chown www:www {} +"
   else
     echo "已放弃同步"
   fi
 fi
-#end################################################################
+
 timer_end "rsync同步"
 
 checkout_back 0
