@@ -398,7 +398,7 @@ class NotificationServer:
             </body></html>
             """
             msg = MIMEText(html_content, 'html', 'utf-8')
-            msg['Subject'] = Header(f'系统通知 [{data["program_name"]}] [{data["message_type"]}]', 'utf-8')
+            msg['Subject'] = Header(f'系统通知 [{data["program_name"]}] [{data["message_type"]}] {data["message_tag"]}', 'utf-8')
             msg['From'] = self.config['mail_from']
             msg['To'] = ','.join(self.config['mail_to'])
             
@@ -422,7 +422,7 @@ class NotificationServer:
                         await self.discord_start()
                     
                     if self.discord_channel:
-                        await self.discord_channel.send(f"[{data["program_name"]}] [{data["message_type"]}]\n{data["title"]}\n\n{data["details"]}")
+                        await self.discord_channel.send(f"[{data["program_name"]}] [{data["message_type"]}] {data["message_tag"]} {data["title"]}")
                         self.logger.debug(f"Discord sent: [{data["program_name"]}] [{data["message_type"]}]")
                         return
                         
@@ -676,7 +676,7 @@ class NotificationServer:
             json_data = json.loads(message)
             data = {
                 "program_name": str(json_data.get('program_name', 'Program name not specified')),
-                "message_type": json_data.get('message_type', 'error'),
+                "message_type": json_data.get('message_type', 'ERROR'),
                 "message_tag": str(json_data.get('message_tag', '')),
                 "title": str(json_data.get('title', 'Title not specified')),
                 "details": str(json_data.get('details', '')),
@@ -684,7 +684,7 @@ class NotificationServer:
         except json.JSONDecodeError as e:
             return self.logger.info(f"json loads message 处理异常 {message}")
         
-        self.logger.info(f"Received message: [{data["program_name"]}] [{data["message_type"]}]\nTitle: {data["title"]}\n\nDetails: {data["details"]}")
+        self.logger.info(f"Received message: [{data["program_name"]}] [{data["message_type"]}] {data["message_tag"]}\nTitle: {data["title"]}\n\nDetails: {data["details"]}")
                     
         # 发送通知
         if self.should_notify(data, 'sound'):

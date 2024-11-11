@@ -27,7 +27,7 @@ esac
 target=""
 messages=()
 message_append=""
-is_all=false
+only_diff=false
 
 # process parameters
 while [[ $# -gt 0 ]]; do
@@ -44,8 +44,8 @@ while [[ $# -gt 0 ]]; do
     message_append="$2"
     shift 2
     ;;
-  all)
-    is_all=true
+  diff)
+    only_diff=true
     shift
     ;;
   *)
@@ -73,8 +73,14 @@ fi
 
 # use the last commit subject if -m is not specified
 if [ ${#messages[@]} -eq 0 ]; then
-  messages+=("$(git log --pretty=format:'%s' origin/master.. -1)")
+  default_branch=$( \
+    git show-ref --verify --quiet refs/heads/main && echo "main" || \
+    git show-ref --verify --quiet refs/heads/master && echo "master" || \
+    git ls-remote --heads origin main 2>/dev/null | grep -q main && echo "main" || \
+    echo "master")
+  messages+=("$(git log --pretty=format:'%s' -1 origin/"${default_branch}".. || git rev-parse --abbrev-ref HEAD || echo "Update")")
 fi
+
 if [[ -n "$message_append" ]]; then
   messages+=("$message_append")
 fi
@@ -93,18 +99,25 @@ if [[ $git_status != *"nothing to commit"* && $git_status != *"无文件要提�
   fi
 fi
 
-# 检查是否有远程仓库
-has_origin=$(git remote | grep -q . && echo true || echo false)
+# 检查远程分支是否存在
+has_remote_branch=$(git ls-remote --heads origin "$target" | grep -q . && echo true || echo false)
 
 # switch to the target branch
 echo -e "\033[1;34m切换到 $target \033[1;0m"
-if $has_origin; then
-  git branch -D "$target"
-  git fetch --all && git fetch -p origin
-fi
-if ! git checkout "$target"; then
-  echo -e "\033[1;31m切换失败, 请检查\033[1;0m"
-  exit 1
+if $has_remote_branch; then
+    echo -e "\033[1;34m检测到远程分支 $target \033[1;0m"
+    git branch -D "$target" 2>/dev/null || true  # 删除本地分支如果存在
+    git fetch origin "$target"
+    git checkout "$target"
+else
+    echo -e "\033[1;34m远程分支 $target 不存在, 请注意本地代码的保管 \033[1;0m"
+    # 如果远程分支不存在，检查本地分支
+    if git show-ref --verify --quiet "refs/heads/$target"; then
+        git checkout "$target"
+    else
+        echo -e "\033[1;31m本地和远程都没有找到该分支: $target\033[1;0m"
+        exit 1
+    fi
 fi
 
 # merge
@@ -115,7 +128,7 @@ if ! git merge "$branch" --no-ff --allow-unrelated-histories -m "$messages_str";
 fi
 
 # push
-if $has_origin; then
+if $has_remote_branch; then
   echo -e "\033[1;34m推送 $target ...\033[1;0m"
   max_attempts=2
   for ((attempt = 1; attempt <= max_attempts; attempt++)); do
@@ -145,7 +158,7 @@ json_file_name="sync_${target}.json"
   _PORT=$(jq -r '.port' "${json_file_name}")
   _ROOT=$(jq -r '.root' "${json_file_name}")
 } || {
-  echo "请添加配置文件 sync_${target}.json"
+  echo -e "\033[1;31m请添加配置文件 sync_${target}.json\033[1;0m"
   exit
 }
 
@@ -164,7 +177,7 @@ REMOTE_DIR=$SERVER_HOME_WORK_PATH$TO_PATH
 
 echo 'v2.4'
 
-if [ "$is_all" = true ]; then
+if [ "$only_diff" != true ]; then
   # read -p "是否要进行全量同步？(将覆盖服务器所有文件, 请注意某些文件对服务器的影响, 如 .env, /runtime, /node_modules, /logs 等) (y/n): " choice
   choice="y"
   if [ "$choice" == "y" ]; then
@@ -207,6 +220,8 @@ if [ "$is_all" = true ]; then
       exclude_params="$exclude_params --exclude='$item'"
     done
 
+    echo -e "\033[1;34m正在同步所有文件: \n$LOCAL_DIR => $REMOTE_DIR\033[1;0m"
+
     # rsync 同步
     eval "rsync -avzP --rsh=\"ssh -p $PORT\" --no-perms --no-owner --no-group $exclude_params \"$LOCAL_DIR\" \"$REMOTE_USER@$REMOTE_IP:$REMOTE_DIR\""
 
@@ -222,9 +237,9 @@ if [ "$is_all" = true ]; then
     # 设置权限
     ssh -p "$PORT" "$REMOTE_USER"@"$REMOTE_IP" "find $REMOTE_DIR -type d -exec chmod 755 {} + ; find $REMOTE_DIR -type f $find_conditions -exec chmod 644 {} + ; find $REMOTE_DIR $find_conditions -exec chown www:www {} +"
 
-    echo "已同步文件：$LOCAL_DIR => $REMOTE_DIR"
+    echo -e "\033[1;34m已同步所有文件\033[1;0m"
   else
-    echo "已放弃同步"
+    echo -e "\033[1;31m已放弃同步\033[1;0m"
   fi
 else
   # 获取所有改变的文件列表
@@ -270,7 +285,7 @@ fi
 # switch back to the task branch
 echo -e "\033[1;34m切回到 ${branch}\033[1;0m"
 git checkout "$branch"
-if $has_origin; then
+if $has_remote_branch; then
   git branch -D "$target"
   git fetch --all && git fetch -p origin
 fi
