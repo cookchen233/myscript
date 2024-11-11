@@ -82,7 +82,29 @@ read_config() {
     local cache_file="$CACHE_DIR/${json_file_name}.cache"
     
     if [[ ! -f "$json_file_name" ]]; then
-        echo -e "\033[1;31m配置文件不存在: $json_file_name\033[1;0m"
+    echo -e "\033[1;31m找不到配置文件 $json_file_name\033[0m"
+    echo -e "\033[1;31m请创建配置文件，格式示例：\033[0m"
+    
+    # 先显示配置文件格式
+    cat << 'EOF'
+{
+    "path": "/",
+    "to_path": "project/",
+    "ip": "118.25.213.111",
+    "user": "username",
+    "port": 22,
+    "root": "/www/wwwroot/"
+}
+EOF
+        
+        # 再显示配置说明
+        echo -e "配置说明:"
+        echo -e "path      - 本地项目相对路径(通常为/)"
+        echo -e "to_path   - 远程项目相对路径(相对于root)"
+        echo -e "ip        - 服务器IP地址"
+        echo -e "user      - SSH用户名"
+        echo -e "port      - SSH端口"
+        echo -e "root      - 远程根目录"
         return 1
     fi
     
@@ -223,6 +245,7 @@ do_rsync() {
     fi
 
     echo "0" > "$SYNC_STATUS_FILE"
+    echo -e "\033[1;32m同步完成\033[1;0m"
     timer_end "rsync同步"
 }
 
@@ -253,6 +276,7 @@ do_git_operations() {
                 return 1
             fi
         fi
+        echo -e "\033[1;32m推送完成\033[1;0m"
     else
         echo -e "\033[1;33m[GIT] 未检测到远程分支，跳过推送步骤\033[0m"
     fi

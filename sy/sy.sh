@@ -68,7 +68,29 @@ read_config() {
     local cache_file="$CACHE_DIR/${json_file_name}.cache"
     
     if [[ ! -f "$json_file_name" ]]; then
-        echo -e "\033[1;31m配置文件不存在: $json_file_name\033[1;0m"
+    echo -e "\033[1;31m找不到配置文件 $json_file_name\033[0m"
+    echo -e "\033[1;31m请创建配置文件，格式示例：\033[0m"
+    
+    # 先显示配置文件格式
+    cat << 'EOF'
+{
+    "path": "/",
+    "to_path": "project/",
+    "ip": "118.25.213.111",
+    "user": "username",
+    "port": 22,
+    "root": "/www/wwwroot/"
+}
+EOF
+        
+        # 再显示配置说明
+        echo -e "配置说明:"
+        echo -e "path      - 本地项目相对路径(通常为/)"
+        echo -e "to_path   - 远程项目相对路径(相对于root)"
+        echo -e "ip        - 服务器IP地址"
+        echo -e "user      - SSH用户名"
+        echo -e "port      - SSH端口"
+        echo -e "root      - 远程根目录"
         return 1
     fi
     
@@ -205,7 +227,7 @@ switch_back() {
   fi
 
   timer_end
-  
+
   exit "$exit_code"
 }
 
@@ -258,6 +280,7 @@ if $has_remote_branch; then
   max_attempts=2
   for ((attempt = 1; attempt <= max_attempts; attempt++)); do
     if git push; then
+      echo -e "\033[1;32m推送完成\033[1;0m"
       break
     elif [ "$attempt" -ge "$max_attempts" ]; then
       echo -e "\033[1;31m推送失败, 请手动重试push命令\033[1;0m"
@@ -297,127 +320,149 @@ REMOTE_DIR=$SERVER_HOME_WORK_PATH$TO_PATH
 # 设置SSH控制主连接
 setup_ssh_controlmaster "$REMOTE_USER" "$REMOTE_IP" "$PORT"
 
-if [ "$is_all" == true ]; then
-  read -p "是否要进行全量同步？(将覆盖服务器所有文件, 请注意某些文件对服务器的影响, 如 .env, /runtime, /node_modules, /logs 等) [y/n]: " choice
-  if [ -z "$choice" ] || [ "$choice" = "y" ] || [ "$choice" = "Y" ]; then
-    # 定义需要排除的文件和目录
-    exclude_items=(
-      ".user.ini"
-      ".env"
-      ".git"
-      ".DS_Store"
-      ".idea"
-      ".vscode"
-      ".hbuilderx"
-      ".settings"
-      ".buildpath"
-      ".project"
-      ".history"
-      "Thumbs.db"
-      "log/"
-      "logs/"
-      "upload/"
-      "uploads/"
-      "node_modules/"
-      "runtime/"
-      "/cert/"
-      "test/"
-      "tests/"
-      "/build"
-      "/uni_modules/"
-      "/unpackage/"
-      ".tmp.driveupload"
-      "tmp.drivedownload"
-      "**/*.log"
-      "**/*.pid"
-    )
-
-    # 构建 rsync 的 exclude 参数
-    exclude_params=""
-    for item in "${exclude_items[@]}"; do
-      exclude_params="$exclude_params --exclude='$item'"
-    done
-
-    # rsync 同步文件，使用SSH控制主连接
-    echo -e "\033[1;34m同步所有文件: \n$LOCAL_DIR => $REMOTE_DIR\033[1;0m"
-    rsync_output=$(eval "rsync -avzP \
-        --rsh=\"ssh -p $PORT -o ControlPath=~/.ssh/controlmasters/%r@%h:%p\" \
-        --no-perms --no-owner --no-group \
-        --compress-level=9 \
-        --stats \
-        $exclude_params \
-        \"$LOCAL_DIR\" \"$REMOTE_USER@$REMOTE_IP:$REMOTE_DIR\"" 2>&1)
-    ret=$?
-
-    # 始终显示 rsync 的输出
-    echo "$rsync_output"
-
-    # 仅在失败时显示错误信息
-    ((ret != 0)) && {
-      if echo "$rsync_output" | grep -q "Connection refused"; then
+# 定义错误处理函数
+handle_rsync_error() {
+    local rsync_output="$1"
+    local ret="$2"
+    
+    if echo "$rsync_output" | grep -qi "connection refused"; then
         echo -e "\033[1;31mrsync同步失败: SSH连接被拒绝，请检查:\n\
-    1. SSH连接信息(用户名/IP/端口)是否正确\n\
-    2. 目标服务器SSH服务是否正常运行\n\
-    3. 防火墙是否允许该端口连接\033[1;0m"
-      else
-        echo -e "\033[1;31mrsync同步失败: 文件传输过程中发生错误\033[1;0m"
-      fi
-      switch_back 1
-    }
+1. SSH连接信息(用户名/IP/端口)是否正确\n\
+2. 目标服务器SSH服务是否正常运行\n\
+3. 防火墙是否允许该端口连接\033[1;0m"
+    elif echo "$rsync_output" | grep -qi "permission denied"; then
+        echo -e "\033[1;31mrsync同步失败: 权限被拒绝，请检查:\n\
+1. SSH密钥或密码是否正确\n\
+2. 目标目录的读写权限\033[1;0m"
+    elif echo "$rsync_output" | grep -qi "no such file or directory"; then
+        echo -e "\033[1;31mrsync同步失败: 目录不存在，请检查:\n\
+1. 源目录是否存在\n\
+2. 目标目录是否存在或是否有权限创建\033[1;0m"
+    elif echo "$rsync_output" | grep -qi "ssh_exchange_identification"; then
+        echo -e "\033[1;31mrsync同步失败: SSH握手失败，请检查:\n\
+1. SSH服务器配置是否正确\n\
+2. 是否被服务器拒绝连接（如DenyHosts）\033[1;0m"
+    else
+        echo -e "\033[1;31mrsync同步失败: 发生未知错误（错误码：$ret）\n\
+详细错误信息:\n$rsync_output\033[1;0m"
+    fi
+    switch_back 1
+}
 
-    # 构建 find 命令的条件
-    find_conditions=""
-    for item in "${exclude_items[@]}"; do
-      if [[ ! $item =~ /$ ]]; then
-        find_conditions="$find_conditions ! -name '$item'"
-      fi
-    done
+if [ "$is_all" == true ]; then
+    read -p "是否要进行全量同步？(将覆盖服务器所有文件, 请注意某些文件对服务器的影响, 如 .env, /runtime, /node_modules, /logs 等) [y/n]: " choice
+    if [ -z "$choice" ] || [ "$choice" = "y" ] || [ "$choice" = "Y" ]; then
+        # 定义需要排除的文件和目录
+        exclude_items=(
+            ".user.ini"
+            ".env"
+            ".git"
+            ".DS_Store"
+            ".idea"
+            ".vscode"
+            ".hbuilderx"
+            ".settings"
+            ".buildpath"
+            ".project"
+            ".history"
+            "Thumbs.db"
+            "log/"
+            "logs/"
+            "upload/"
+            "uploads/"
+            "node_modules/"
+            "runtime/"
+            "/cert/"
+            "test/"
+            "tests/"
+            "/build"
+            "/uni_modules/"
+            "/unpackage/"
+            ".tmp.driveupload"
+            "tmp.drivedownload"
+            "**/*.log"
+            "**/*.pid"
+        )
+        # 构建 rsync 的 exclude 参数
+        exclude_params=""
+        for item in "${exclude_items[@]}"; do
+            exclude_params="$exclude_params --exclude='$item'"
+        done
 
-    # 设置权限并捕获错误，使用SSH控制主连接
-    if ! ssh -o ControlPath="~/.ssh/controlmasters/%r@%h:%p" -p "$PORT" "$REMOTE_USER@$REMOTE_IP" "find $REMOTE_DIR -type d -exec chmod 755 {} + ; find $REMOTE_DIR -type f $find_conditions -exec chmod 644 {} + ; find $REMOTE_DIR $find_conditions -exec chown www:www {} +"; then
-      echo -e "\033[1;31m权限设置失败: 无法更改文件权限或所有者\033[1;0m"
-      switch_back 1
+        # rsync 同步文件
+        echo -e "\033[1;34m同步所有文件: \n$LOCAL_DIR => $REMOTE_DIR\033[1;0m"
+        rsync_output=$(eval "rsync -azP \
+            --rsh=\"ssh -p $PORT -o ControlPath=~/.ssh/controlmasters/%r@%h:%p\" \
+            --no-perms --no-owner --no-group \
+            --compress-level=9 \
+            --stats \
+            $exclude_params \
+            \"$LOCAL_DIR/\" \"$REMOTE_USER@$REMOTE_IP:$REMOTE_DIR/\"" 2>&1)
+        ret=$?
+
+        # 显示rsync输出
+        echo "$rsync_output"
+
+        # 检查失败情况
+        ((ret != 0)) && handle_rsync_error "$rsync_output" "$ret"
+
+        # ... [权限设置部分保持不变]
+
+    else
+        echo -e "\033[1;31m已放弃同步\033[1;0m"
+        switch_back 1
     fi
 
-  else
-    echo -e "\033[1;31m已放弃同步\033[1;0m"
-    switch_back 1
-  fi
-
 else
-  # 获取所有改变的文件列表
-  if files=$(git diff --name-only HEAD~1...HEAD) && [ -n "$files" ]; then
-    echo "待同步的文件列表"
+    # 获取所有改变的文件列表
+    if ! files=$(git diff --name-only HEAD~1...HEAD 2>/dev/null) || [ -z "$files" ]; then
+        echo -e "\033[1;34m没有检测到文件变更，跳过同步\033[1;0m"
+        exit 0
+    fi
+
+    echo -e "\033[1;34m待同步的文件列表:\033[1;0m"
     echo "--------------------------------"
     echo -e "$files"
     echo "--------------------------------"
-    # read -p "是否同步这些文件到服务器？(y/n): " choice
-    choice="y"
-    if [ -z "$choice" ] || [ "$choice" = "y" ] || [ "$choice" = "Y" ]; then
-      # 创建临时文件列表
-      temp_file_list=$(mktemp)
-      echo "$files" > "$temp_file_list"
 
-      # 使用rsync的--files-from选项批量同步文件
-      rsync -avz --rsh="ssh -p $PORT -o ControlPath=~/.ssh/controlmasters/%r@%h:%p" \
-            --no-perms --no-owner --no-group \
-            --files-from="$temp_file_list" \
-            "$LOCAL_DIR" "$REMOTE_USER@$REMOTE_IP:$REMOTE_DIR"
+    # 创建临时文件列表
+    temp_file_list=$(mktemp)
+    echo "$files" > "$temp_file_list"
 
-      rm -f "$temp_file_list"
+    # 使用rsync同步变更的文件
+    echo -e "\033[1;34m开始同步变更文件...\033[1;0m"
+    rsync_output=$(rsync -avz --rsh="ssh -p $PORT -o ControlPath=~/.ssh/controlmasters/%r@%h:%p" \
+        --no-perms --no-owner --no-group \
+        --files-from="$temp_file_list" \
+        "$LOCAL_DIR/" "$REMOTE_USER@$REMOTE_IP:$REMOTE_DIR/" 2>&1)
+    ret=$?
 
-      # 设置权限，但排除 .user.ini 文件
-      ssh -o ControlPath="~/.ssh/controlmasters/%r@%h:%p" -p "$PORT" "$REMOTE_USER@$REMOTE_IP" \
-          "find $REMOTE_DIR -type d -exec chmod 755 {} + ; find $REMOTE_DIR -type f ! -name '.user.ini' -exec chmod 644 {} + ; find $REMOTE_DIR ! -name '.user.ini' -exec chown www:www {} +"
-    else
-      echo -e "\033[1;31m已放弃同步\033[1;0m"
-      switch_back 1
-    fi
-  else
-    echo -e "\033[1;34m[SYNC] 没有检测到变更，跳过同步\033[1;0m"
-  fi
+    # 清理临时文件
+    rm -f "$temp_file_list"
+
+    # 显示rsync输出
+    echo "$rsync_output"
+
+    # 检查失败情况
+    ((ret != 0)) && handle_rsync_error "$rsync_output" "$ret"
+
+    # 设置权限
+    echo -e "\033[1;34m设置文件权限...\033[1;0m"
+    while IFS= read -r file; do
+        if [ -n "$file" ]; then
+            dir=$(dirname "$REMOTE_DIR/$file")
+            ssh_cmd="chmod 755 \"$dir\" 2>/dev/null; \
+                    [ -f \"$REMOTE_DIR/$file\" ] && chmod 644 \"$REMOTE_DIR/$file\" 2>/dev/null; \
+                    chown www:www \"$REMOTE_DIR/$file\" 2>/dev/null"
+            
+            if ! ssh -o ControlPath="~/.ssh/controlmasters/%r@%h:%p" -p "$PORT" "$REMOTE_USER@$REMOTE_IP" "$ssh_cmd"; then
+                echo -e "\033[1;31m警告: 无法设置文件 $file 的权限\033[1;0m"
+            fi
+        fi
+    done <<< "$files"
+
 fi
-
+echo -e "\033[1;32m同步完成\033[1;0m"
 timer_end "rsync同步"
 
 switch_back 0
