@@ -134,7 +134,7 @@ messages_str="${messages_str%"$'\n\n\n'"}"
 messages_str=${messages_str:-"脚本自动提交"}
 
 # switch back to the task branch
-check_back() {
+checkout_back() {
   local exit_code="${1:-0}"
 
   echo -e "\033[1;34m切回到 ${branch}\033[1;0m"
@@ -191,7 +191,7 @@ fi
 echo -e "\033[1;34m合并 $branch 到 ${target}\033[1;0m"
 if ! git merge "$branch" --no-ff --allow-unrelated-histories -m "$messages_str"; then
   echo -e "\033[1;31m合并失败, 请检查\033[1;0m"
-  check_back 1
+  checkout_back 1
 fi
 
 timer_start "git推送"
@@ -204,7 +204,7 @@ if $has_remote_branch; then
       break
     elif [ "$attempt" -ge "$max_attempts" ]; then
       echo -e "\033[1;31m推送失败, 请手动重试push命令\033[1;0m"
-      check_back 1
+      checkout_back 1
     fi
   done
 else
@@ -229,7 +229,7 @@ json_file_name="sync_${target}.json"
   _ROOT=$(jq -r '.root' "${json_file_name}")
 } || {
   echo -e "\033[1;31m请添加配置文件 sync_${target}.json\033[1;0m"
-  check_back 1
+  checkout_back 1
 }
 
 if [ "$_ROOT" != null ]; then
@@ -290,7 +290,7 @@ if [ "$only_diff" != true ]; then
     # 测试 SSH 连接
     # if ! ssh -p "$PORT" "$REMOTE_USER@$REMOTE_IP" "exit" 2>/dev/null; then
     #   echo -e "\033[1;31mSSH连接失败: 无法连接到远程服务器 $REMOTE_USER@$REMOTE_IP:$PORT\033[1;0m"
-    #   check_back 1
+    #   checkout_back 1
     # fi
 
     # rsync 同步文件
@@ -311,7 +311,7 @@ if [ "$only_diff" != true ]; then
       else
         echo -e "\033[1;31mrsync同步失败: 文件传输过程中发生错误\033[1;0m"
       fi
-      check_back 1
+      checkout_back 1
     }
 
     # 构建 find 命令的条件
@@ -325,7 +325,7 @@ if [ "$only_diff" != true ]; then
     # 设置权限并捕获错误
     if ! ssh -p "$PORT" "$REMOTE_USER@$REMOTE_IP" "find $REMOTE_DIR -type d -exec chmod 755 {} + ; find $REMOTE_DIR -type f $find_conditions -exec chmod 644 {} + ; find $REMOTE_DIR $find_conditions -exec chown www:www {} +"; then
       echo -e "\033[1;31m权限设置失败: 无法更改文件权限或所有者\033[1;0m"
-      check_back 1
+      checkout_back 1
     fi
 
   else
@@ -374,4 +374,4 @@ fi
 #end################################################################
 timer_end "rsync同步"
 
-check_back 0
+checkout_back 0
