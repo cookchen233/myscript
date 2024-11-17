@@ -23,12 +23,6 @@ from aiohttp_socks import ProxyConnector
 # 加载环境变量
 load_dotenv()
 
-# 消息类型定义
-class ErrorLevel:
-    DEBUG = 'debug'
-    INFO = 'info'
-    ERROR = 'error'
-
 class NotificationConfig:
     def __init__(self):
         self.config = {

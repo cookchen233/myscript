@@ -187,16 +187,13 @@ do_rsync() {
 
     # 基础的rsync选项
     declare -a base_rsync_opts=(
-        --rsh="ssh -p $PORT -o ControlPath=~/.ssh/controlmasters/%r@%h:%p"
-        --no-perms
-        --no-owner
-        --no-group
-        --compress-level=9
-        --stats
-        --numeric-ids
-        --inplace
-        --no-whole-file
-    )
+    --rsh="ssh -p $PORT -o ControlPath=~/.ssh/controlmasters/%r@%h:%p"
+    -azuP
+    --no-perms
+    --no-owner
+    --no-group
+    --compress-level=9
+)
 
     # 构建special_perm条件
     declare -a special_perm_files=(
@@ -225,9 +222,6 @@ do_rsync() {
         # 构建全量同步的rsync选项
         declare -a rsync_opts=(
             "${base_rsync_opts[@]}"
-            -azP
-            --compress-level=9
-            --stats
         )
 
         # 添加排除项
@@ -236,7 +230,7 @@ do_rsync() {
         done
 
         # 执行文件同步
-        echo -e "\033[1;34m[SYNC] 开始全量同步:\n$LOCAL_DIR => $REMOTE_DIR\033[0m"
+        echo -e "\033[1;34m开始全量同步:\n$LOCAL_DIR => $REMOTE_DIR\033[0m"
         if rsync_output=$(rsync "${rsync_opts[@]}" \
             "$LOCAL_DIR/" "$REMOTE_USER@$REMOTE_IP:$REMOTE_DIR/" 2>&1); then
             echo "$rsync_output"
@@ -264,10 +258,9 @@ do_rsync() {
         echo "$files" > "$temp_file_list"
 
         # 同步变更文件
-        echo -e "\033[1;34m[SYNC] 开始增量同步...\033[0m"
+        echo -e "\033[1;34m开始增量同步...\033[0m"
         declare -a rsync_opts=(
             "${base_rsync_opts[@]}"
-            -avz
             --files-from="$temp_file_list"
         )
 
@@ -282,7 +275,7 @@ do_rsync() {
     fi
 
     # 统一的权限设置逻辑
-    echo -e "\033[1;34m[PERM] 设置权限...\033[0m"
+    echo -e "\033[1;34m设置权限...\033[0m"
     ssh_cmd="cd '$REMOTE_DIR' && {
         find . -type d -exec chmod 755 {} + &
         find . -type f $special_perm -exec chmod 644 {} + &
@@ -291,9 +284,10 @@ do_rsync() {
     }"
 
     if ! ssh -o ControlPath="~/.ssh/controlmasters/%r@%h:%p" \
-            -p "$PORT" \
-            "$REMOTE_USER@$REMOTE_IP" \
-            "$ssh_cmd"; then
+        -p "$PORT" \
+        "$REMOTE_USER@$REMOTE_IP" \
+        "$ssh_cmd" 2>/dev/null &
+    then
         echo -e "\033[1;31m[ERROR] 权限设置失败\033[0m" >&2
         echo "1" > "$SYNC_STATUS_FILE"
         return 1
@@ -314,26 +308,26 @@ do_git_operations() {
     timer_start "git操作"
 
     # merge
-    echo -e "\033[1;34m[GIT] 合并 $branch 到 ${target}\033[1;0m"
+    echo -e "\033[1;34m合并 $branch 到 ${target}\033[1;0m"
     if ! git merge "$branch" --no-ff --allow-unrelated-histories -m "$messages_str"; then
-        echo -e "\033[1;31m[GIT] 合并失败\033[1;0m" >&2
+        echo -e "\033[1;31m合并失败\033[1;0m" >&2
         echo "1" > "$GIT_STATUS_FILE"
         return 1
     fi
 
     # push
     if $has_remote_branch; then
-        echo -e "\033[1;34m[GIT] 推送 $target ...\033[1;0m"
+        echo -e "\033[1;34m推送 $target ...\033[1;0m"
         if ! git push --no-verify; then
             if ! git pull --rebase && ! git push --no-verify; then
-                echo -e "\033[1;31m[GIT] 推送失败\033[1;0m" >&2
+                echo -e "\033[1;31m推送失败\033[1;0m" >&2
                 echo "1" > "$GIT_STATUS_FILE"
                 return 1
             fi
         fi
         echo -e "\033[1;32m推送完成\033[1;0m"
     else
-        echo -e "\033[1;33m[GIT] 未检测到远程分支，跳过推送步骤\033[0m"
+        echo -e "\033[1;33m未检测到远程分支，跳过推送步骤\033[0m"
     fi
 
     echo "0" > "$GIT_STATUS_FILE"
@@ -354,7 +348,8 @@ switch_back() {
     
     if $has_remote; then
         echo -e "\033[1;34m删除本地分支 ${target_branch}\033[1;0m"
-        git branch -D "$target_branch"
+        git branch -D "$target_branch" &
+        git fetch -p origin &
     fi
 }
 
@@ -470,7 +465,7 @@ main() {
     echo -e "\033[1;34m切换到 $target \033[1;0m"
     branch_switched=false
     if $has_remote_branch; then
-        echo -e "\033[1;34m检测到远程分支 $target \033[1;0m"
+        echo -e "\033[1;34m检测到远程分支, 删除本地 $target \033[1;0m"
         git branch -D "$target" 2>/dev/null || true
         if ! git checkout "$target"; then
             echo -e "\033[1;31m切换分支失败\033[1;0m"

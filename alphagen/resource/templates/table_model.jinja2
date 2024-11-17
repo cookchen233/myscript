@@ -1,0 +1,20 @@
+<?php
+
+namespace app\common\model{% if module_name %}\{{ module_name }}{% endif %};
+{% if module_name %}
+use app\common\model\BaseMdoel;{% endif %}
+
+/**
+ * 表描述: {{table_comment}}
+ * 表名: {{table_name}}
+ * @generated {{ datetime.now().strftime('%Y-%m-%d %H:%M:%S') }}
+ * @updated {{ datetime.now().strftime('%Y-%m-%d %H:%M:%S') }}
+ *
+ * <!-- BEGIN PROPERTIES -->{% for property in properties %}
+ * @property {{property.property_type}} ${{property.field_name}} {{property.field_comment}}{% endfor %}
+ * <!-- END PROPERTIES -->
+*/
+class {{class_name}} extends BaseMdoel
+{
+    protected $name = '{{ table_name|replace(table_prefix, "") }}';
+}

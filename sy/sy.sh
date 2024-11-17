@@ -220,13 +220,13 @@ switch_back() {
 
   if $has_remote_branch; then
     echo -e "\033[1;34m删除本地分支 ${target}\033[1;0m"
-    git branch -D "$target"
-    git fetch -p origin &  # 后台执行清理
+    git branch -D "$target" &
+    git fetch -p origin &
   fi
 
   # 清理SSH控制主连接
   if [[ -n "$REMOTE_USER" && -n "$REMOTE_IP" && -n "$PORT" ]]; then
-    ssh -O stop -o ControlPath="~/.ssh/controlmasters/%r@%h:%p" -p "$PORT" "$REMOTE_USER@$REMOTE_IP" 2>/dev/null
+    ssh -O stop -o ControlPath="~/.ssh/controlmasters/%r@%h:%p" -p "$PORT" "$REMOTE_USER@$REMOTE_IP" 2>/dev/null &
   fi
 
   timer_end
@@ -380,7 +380,6 @@ if [ "$is_all" == true ]; then
         # 初始化排除项
         declare -a exclude_items=(
             ".git"
-            ".git*"
         )
 
         # 从.gitignore读取排除项
@@ -396,7 +395,7 @@ if [ "$is_all" == true ]; then
         # 构建全量同步的rsync选项
         declare -a rsync_opts=(
             "${base_rsync_opts[@]}"
-            -azP
+            -azuP
             --compress-level=9
             --stats
         )
@@ -442,7 +441,7 @@ else
     echo -e "\033[1;34m[SYNC] 开始增量同步...\033[0m"
     declare -a rsync_opts=(
         "${base_rsync_opts[@]}"
-        -avz
+        -azP
         --files-from="$temp_file_list"
     )
 

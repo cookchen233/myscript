@@ -1,0 +1,83 @@
+<?php
+
+namespace app\common\dao\basic;
+
+use app\admin\model\{{ model_name }};
+use app\common\bean\{{ bean_name }};
+use think\Db;
+use think\Exception;
+use think\exception\PDOException;
+
+/**
+ * 提供针对 表【{{ table_name }}】的相关操作
+ *
+ * @method {{ bean_name }} getRow(int|string $pk_value) 根据主键获取单条数据
+ * @param int|string $pk_value 主键值
+ *
+ * @method {{ model_name }} getDefaultModel() 获得 Dao 类指定表的默认模型实例 (如果存在表模型类文件)
+ *
+ * @method false|int createOrUpdateRow({{ bean_name }} {{bean_variable_name}}, $forceCreate = false) 创建或更新一条数据, 如果有主键数据, 则为更新
+ * @param {{ bean_name }} {{bean_variable_name}}
+ * @param bool $forceCreate 是否强制创建
+ *
+ * @method array|string getError() 返回操作模型时的错误
+ */
+abstract class {{ class_name }} extends AlphaBasicDao
+{
+    /**
+     * 获取 表名
+     * @return string 表名
+     */
+    protected function getTableName() : string
+    {
+        return '{{ table_name | replace('tp_', '') }}';
+    }
+
+    /**
+     * 获取 数据库名
+     * @return string 数据库名
+     */
+    protected function getDatabaseName() : ?string
+    {
+        return null;
+    }
+
+    /**
+     * 获取 基础表的 bean name
+     */
+    protected function getTableBeanName() : ?string
+    {
+        return '\\app\\common\\bean\\{{ bean_name }}';
+    }
+
+    /**
+     * 新增一条数据
+     * @param {{ bean_name }} {{ bean_variable_name }}
+     * @param bool $replace 是否替换
+     * @param bool $getLastInsID 是否返回自增主键
+     * @param string|null $sequence 自增序列名
+     * @return integer|string 新增记录条数|新数据的id
+     * @throws Exception
+     */
+    public function insert(
+        {{ bean_name }} {{ bean_variable_name }},
+        bool $replace = false,
+        bool $getLastInsID = false,
+        string $sequence = null
+    ) {
+        $data = {{ bean_variable_name }}->toArray();
+        return db('{{ table_name | replace('tp_', '') }}')->insert($data, $replace, $getLastInsID, $sequence);
+    }
+
+    /**
+     * 更新数据
+     * @param {{ bean_name }} {{ bean_variable_name }}
+     * @return integer|string
+     * @throws Exception
+     */
+    public function update({{ bean_name }} {{ bean_variable_name }})
+    {
+        $data = {{ bean_variable_name }}->toArray();
+        return db('{{ table_name | replace('tp_', '') }}')->update($data);
+    }
+}

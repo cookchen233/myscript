@@ -1,0 +1,111 @@
+<?php
+declare(strict_types=1);
+
+namespace app\{{ module_name }}\dto;
+
+use app\common\bean\BasicBean;
+
+/**
+ * {{class_comment}}
+ */
+class {{class_name}} extends BasicBean implements \JsonSerializable {
+{
+    {% for property in properties %}
+    /**
+     * {{ property.field_comment }}
+     * @var {{ property.property_type }}
+     */
+    private ${{property.name}};
+{% endfor %}{% for property in properties %}
+    /**
+     * 获取 {{property.field_comment}}
+     * @return {{property.property_type}}|null {{property.field_comment}}
+     */
+    public function {{property.get_method_name}}() : ?{{property.property_type}}
+    {
+        return $this->{{property.name}};
+    }
+
+    /**
+    * 设置 {{property.field_comment}}
+    * @param {{property.property_type}}|null ${{property.name}} {{property.field_comment}}
+    * @return {{class_name}} 当前对象
+    */
+    public function {{property.set_method_name}}({{property.property_type}} ${{property.name}} = null) : {{class_name}}
+    {
+    $this->{{property.name}} = ${{property.name}};
+    $this->flagSet('{{property.name}}');
+    return $this;
+    }
+{% endfor %}
+function forQuickSettings(){
+{% for property in properties -%}
+    {{bean_variable_name}}->{{property.set_method_name}}();
+{% endfor %}
+}
+
+/**
+* 构造函数<br/><br/>
+* {{class_comment}}<br/>
+* @param array $data 数组, 键名为蛇形风格
+*/
+public function __construct($data = [])
+{   {%- for property in properties %}
+    $this->{{property.name}} = isset($row['{{property.field_name}}']) ? $row['{{property.field_name}}'] : $this->{{property.name}};{% endfor %}
+}
+
+/**
+* 附加上类的信息（注意在定义函数时需要指定对应的返回值的类型）
+* @param mixed $object 对象
+* @return {{class_name}}|null
+*/
+public static function attachClassInfo($object) : ?{{class_name}}
+{
+return $object;
+}
+
+/**
+* 转成字符串
+* @return string|null 字符串
+*/
+public function __toString() : ?string
+{
+return dump($this, false);
+}
+
+/**
+* 转成数组
+* @param bool $includeAllFields 是否包含全部字段(true - 包含全部字段, false(默认) - 只包含调用过对应的setter方法的字段)
+* @return array 数组
+*/
+public function toArray(bool $includeAllFields = false) : array
+{
+$data = array();
+{% for property in properties %}
+    if ($includeAllFields === true || $this->isset('{{property.name}}')) {
+    $data['{{property.field_name}}'] = $this->{{property.get_method_name}}();
+    }
+{% endfor %}
+return $data;
+}
+
+/**
+* 转成 JSON
+* @return array 数组
+*/
+public function jsonSerialize() {
+$reflection = new \ReflectionObject($this);
+$methods = $reflection->getMethods(\ReflectionMethod::IS_PUBLIC);
+
+$getMethodsData = [];
+
+foreach ($methods as $method) {
+if (strpos($method->name, 'get') === 0) {
+$propertyName = lcfirst(substr($method->name, 3));
+$getMethodsData[$propertyName] = $this->{$method->name}();
+}
+}
+
+return $getMethodsData;
+}
+}

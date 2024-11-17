@@ -1,0 +1,1 @@
+2024-10-24 10:18:55 'GenerateTableModel' object has no attribute 'module_name'
