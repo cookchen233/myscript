@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+# main.py
 import argparse
 from generator import Generator
 

@@ -6,6 +6,7 @@ DEFAULT_CONFIGS = {
         'dao': "/Users/Chen/Coding/phpcode/app/common/dao",
         'basic_dao': "/Users/Chen/Coding/phpcode/app/common/dao",
         'dto': "/Users/Chen/Coding/phpcode/app/common/dto",
+        'vue': "/Users/Chen/Coding/admin-vue/src/pages",
     },
     'mysql': {
         'host': '118.25.213.19',

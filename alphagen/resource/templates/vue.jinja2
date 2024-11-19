@@ -1,0 +1,355 @@
+<template>
+  <div class='page-container'>
+    <div class="page-content">
+      <page-head title='{{ table_comment }}'></page-head>
+      <enum-provider url="/{{ module_name }}.Common/options" :fields="[{% for field in enum_fields %}'{{ field.field }}s'{{ ',' if not loop.last }}{% endfor %}]">
+      <el-form label-position="left" label-width="auto" :inline="true">
+        {# 搜索表单 #}
+        {% for field in search_fields %}
+        <el-form-item label="{{ field.label }}" class="mt-[20px]">
+          {% if field.type == 'text' %}
+          <el-input v-model="query.{{ field.field }}" placeholder="请输入{{ field.label }}" :prefix-icon="Search"/>
+          {% elif field.type == 'select' %}
+          <enum-selector
+            v-model="query.{{ field.field }}"
+            field="{{ field.field }}s"
+            placeholder="请选择{{ field.label }}"
+            clearable
+            class="w-[320px]"
+        />
+          {% elif field.type == 'daterange' %}
+          <el-date-picker v-model="{{ field.field }}Range" type="daterange" range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期" value-format="YYYY-MM-DD" @change="handle{{ field.prop|capitalize }}RangeChange"/>
+          {% elif field.type == 'numberrange' %}
+          <div class="flex items-center gap-2">
+            <el-input-number v-model="query.{{ field.start_field }}" placeholder="最小值" :min="0" clearable/>
+            <span>-</span>
+            <el-input-number v-model="query.{{ field.end_field }}" placeholder="最大值" :min="0" clearable/>
+          </div>
+          {% endif %}
+        </el-form-item>
+        {% endfor %}
+        {# 操作按钮 #}
+        <el-form-item class="mt-[20px]">
+          <el-button type="primary" @click="handleSearch">搜索</el-button>
+          <el-button @click="handleReset">重置</el-button>
+          <el-button type="success" @click="handleAdd">添加</el-button>
+        </el-form-item>
+      </el-form>
+      {# 表格 #}
+      <div class="mt-[20px]">
+        <el-table :data="tableData" v-loading="loading" border>
+          {% for field in table_fields %}
+          <el-table-column prop="{{ field.field }}" label="{{ field.label }}"{% if field.show_overflow_tooltip %} :show-overflow-tooltip="true"{% endif %}>
+            {% if field.type == 'tag' %}
+            <template #default="{row}">
+              <el-tag :type="getTagType(row.{{ field.field }})">{{ '{{' }} getOptionLabel({{ field.field }}Options, row.{{ field.field }}) {{ '}}' }}</el-tag>
+            </template>
+            {% elif field.type == 'enum' %}
+            <template #default="{row}">
+            <el-tag :type="getTagType(row.{{ field.field }})">
+                {{ '{{' }} getOptionLabel({{ field.field }}Options, row.{{ field.field }}) {{ '}}' }}
+            </el-tag>
+            </template>
+            {% elif field.type == 'image' %}
+            <template #default="{row}">
+              <el-image v-if="row.{{ field.field }}" :src="row.{{ field.field }}" :preview-src-list="[row.{{ field.field }}]" style="width: 80px; height: 60px" fit="cover"/>
+            </template>
+            {% elif field.type == 'datetime' %}
+            <template #default="{row}">{{ '{{' }} formatDateTime(row.{{ field.field }}) {{ '}}' }}</template>
+            {% elif field.type == 'money' %}
+            <template #default="{row}">¥{{ '{{' }} row.{{ field.field }} {{ '}}' }}</template>
+            {% endif %}
+          </el-table-column>
+          {% endfor %}
+          <el-table-column label="操作" width="150" fixed="right">
+            <template #default="{row}">
+              <el-button type="primary" link @click="handleEdit(row)">编辑</el-button>
+              <el-button type="danger" link @click="handleDelete(row)">删除</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+        <div class="mt-[20px] flex justify-end">
+          <el-pagination v-model:current-page="query.page" v-model:page-size="query.page_size" :total="total" :page-sizes="[10, 20, 50, 100]" @size-change="handleSizeChange" @current-change="handleCurrentChange"/>
+        </div>
+      </div>
+      </enum-provider>
+    </div>
+    {# 编辑弹窗 #}
+    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑' : '新增'" width="500px" :close-on-click-modal="false">
+      <el-form ref="formRef" :model="formData" :rules="rules" label-position="right" label-width="100px">
+        {% for field in form_fields %}
+        <el-form-item label="{{ field.label }}" prop="{{ field.field }}"{% if field.required %} required{% endif %}>
+          {% if field.type == 'text' %}
+          <el-input v-model="formData.{{ field.field }}" placeholder="请输入{{ field.label }}"/>
+          {% elif field.type == 'textarea' %}
+          <el-input v-model="formData.{{ field.field }}" type="textarea" :rows="4" placeholder="请输入{{ field.label }}"/>
+          {% elif field.type == 'number' %}
+          <el-input-number v-model="formData.{{ field.field }}" :min="{{ field.min }}" style="width: 100%"/>
+          {% elif field.type == 'select' %}
+          <el-select v-model="formData.{{ field.field }}" placeholder="请选择{{ field.label }}" style="width: 100%">
+            <el-option v-for="item in {{ field.field }}Options" :key="item.value" :label="item.label" :value="item.value"/>
+          </el-select>
+          {% elif field.type == 'enum-selector' %}
+            <enum-selector
+                v-model="formData.{{ field.field }}"
+                field="{{ field.field }}s"
+                placeholder="请选择{{ field.label }}"
+                class="w-[320px]"
+            />
+          {% elif field.type == 'datetime' %}
+          <el-date-picker v-model="formData.{{ field.field }}" type="datetime" placeholder="请选择{{ field.label }}" style="width: 100%"/>
+          {% elif field.type == 'upload-image' %}
+          <upload-image v-model="formData.{{ field.field }}"/>
+          {% elif field.type == 'upload-file' %}
+          <upload-file v-model="formData.{{ field.field }}"/>
+          {% endif %}
+        </el-form-item>
+        {% endfor %}
+      </el-form>
+      <template #footer>
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleSubmit">确定</el-button>
+      </template>
+    </el-dialog>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, reactive, onMounted } from 'vue'
+import { ElMessage, ElMessageBox, FormInstance, FormRules } from 'element-plus'
+import { Search } from '@element-plus/icons-vue'
+import { useGlobalProperties } from "@/composables/useGlobalProperties"
+import { ApiResponse, OptionItem } from '@/types/common'
+import EnumProvider from "@/components/enum-provider.vue"
+import EnumSelector from "@/components/enum-selector.vue"
+
+const { $lc } = useGlobalProperties()
+
+const API = {
+  list: '/{{ module_name }}.{{ class_name }}/list',
+  create: '/{{ module_name }}.{{ class_name }}/create',
+  update: '/{{ module_name }}.{{ class_name }}/update',
+  delete: '/{{ module_name }}.{{ class_name }}/delete',
+  restore: '/{{ module_name }}.{{ class_name }}/restore',
+  restoreBatch: '/{{ module_name }}.{{ class_name }}/restoreBatch',
+  read: '/{{ module_name }}.{{ class_name }}/read',
+}
+
+
+// 查询参数
+const query = reactive({
+  page: 1,
+  page_size: 20,
+  {% for field in search_fields -%}
+  {{ field.field }}: '',
+  {% if field.type == 'daterange' -%}
+  {{ field.start_field }}: '',
+  {{ field.end_field }}: '',
+  {%- endif %}
+  {% if field.type == 'numberrange' -%}
+  {{ field.start_field }}: null,
+  {{ field.end_field }}: null,
+  {%- endif %}
+  {%- endfor %}
+})
+
+// 表单数据
+const formData = reactive({
+  {% for field in form_fields -%}
+  {{ field.field }}: {% if field.type == 'number' %}0{% else %}''{% endif %}{{ ',' if not loop.last }}
+  {%- endfor %}
+})
+
+// 表单校验规则
+const rules = reactive<FormRules>({
+  {% for field in form_fields -%}
+  {% if field.required -%}
+  {{ field.field }}: [
+    { 
+      required: true, 
+      message: '请{% if field.type == "select" %}选择{% else %}输入{% endif %}{{ field.label }}', 
+      trigger: '{% if field.type == "select" %}change{% else %}blur{% endif %}'
+    }
+  ]{{ ',' if not loop.last }}
+  {%- endif %}
+  {%- endfor %}
+})
+
+// 选项数据
+{%- for field in form_fields %}
+{%- if field.type == 'select' %}
+const {{ field.field }}Options = ref([])
+{%- endif %}
+{%- endfor %}
+
+// 表格数据
+const tableData = ref([])
+const total = ref(0)
+const loading = ref(false)
+const dialogVisible = ref(false)
+const isEdit = ref(false)
+const formRef = ref<FormInstance>()
+
+// 获取列表数据
+const getList = async () => {
+  loading.value = true
+  try {
+    const res = await $lc.get<ApiResponse<null>>(API.list, query)
+    tableData.value = res.data.list
+    total.value = res.data.total
+  } catch (error) {
+    console.error(error)
+  }
+  loading.value = false
+}
+
+// 获取详情
+const getDetail = async (id: number) => {
+  try {
+    const res = await $lc.get<ApiResponse<null>>(API.detail, { id })
+    Object.assign(formData, res.data)
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+// 搜索
+const handleSearch = () => {
+  query.page = 1
+  lcTableTs.value?.getList()
+}
+
+// 重置
+const handleReset = () => {
+  Object.assign(query, {
+    page: 1,
+    page_size: 20,
+    {%- for field in search_fields %}
+    {{ field.field }}: '',
+    {%- if field.type == 'daterange' %}
+    {{ field.start_field }}: '',
+    {{ field.end_field }}: '',
+    {%- endif %}
+    {%- if field.type == 'numberrange' %}
+    {{ field.start_field }}: null,
+    {{ field.end_field }}: null,
+    {%- endif %}
+    {%- endfor %}
+  })
+  getList()
+}
+
+// 分页处理
+const handleSizeChange = (val: number) => {
+  query.page_size = val
+  getList()
+}
+
+const handleCurrentChange = (val: number) => {
+  query.page = val
+  getList()
+}
+
+// 日期范围变化处理
+{%- for field in search_fields %}
+{%- if field.type == 'daterange' %}
+const {{ field.field }}Range = ref()
+const handle{{ field.prop|capitalize }}RangeChange = (val: [string, string] | null) => {
+  if (val) {
+    query.{{ field.start_field }} = val[0]
+    query.{{ field.end_field }} = val[1]
+  } else {
+    query.{{ field.start_field }} = ''
+    query.{{ field.end_field }} = ''
+  }
+}
+{%- endif %}
+{%- endfor %}
+
+// 新增
+const handleAdd = () => {
+  isEdit.value = false
+  Object.assign(formData, {
+    {%- for field in form_fields %}
+    {{ field.field }}: {% if field.type == 'number' %}0{% else %}''{% endif %}{{ ',' if not loop.last }}
+    {%- endfor %}
+  })
+  dialogVisible.value = true
+}
+
+// 编辑
+const handleEdit = async (row: any) => {
+  isEdit.value = true
+  await getDetail(row.id)
+  dialogVisible.value = true
+}
+
+// 删除
+const handleDelete = (row: any) => {
+  ElMessageBox.confirm('确认删除该记录?', '提示', {
+    type: 'warning'
+  }).then(async () => {
+    try {
+      await $lc.post<ApiResponse<null>>(API.delete, { id: row.id })
+      ElMessage.success('删除成功')
+      getList()
+    } catch (error) {
+      console.error(error)
+    }
+  })
+}
+
+// 表单提交
+const handleSubmit = async () => {
+  if (!formRef.value) return
+  await formRef.value.validate(async (valid, fields) => {
+    if (valid) {
+      try {
+        const api = isEdit.value ? API.update : API.create
+        await $lc.post<ApiResponse<null>>(api, formData)
+        ElMessage.success(`${isEdit.value ? '修改' : '添加'}成功`)
+        dialogVisible.value = false
+        getList()
+      } catch (error) {
+        console.error(error)
+      }
+    }
+  })
+}
+
+// 枚举数据引用
+{% for field in enum_fields %}
+const {{ field.enum_name }} = ref<OptionItem[]>([])
+{% endfor %}
+
+// 状态标签类型
+const getTagType = (status: number) => {
+  const statusMap: Record<number, string> = {
+    0: 'info',
+    1: 'success',
+    2: 'warning',
+    3: 'danger'
+  }
+  return statusMap[status] || 'info'
+}
+
+const getOptionLabel = (options: any[], value: any) => {
+  const option = options.find(item => item.value === value)
+  return option ? option.label : ''
+}
+
+const formatDateTime = (val: string) => {
+  if (!val) return ''
+  return new Date(val).toLocaleString()
+}
+
+onMounted(() => {
+  getList()
+})
+</script>
+
+<style scoped>
+.page-container {
+  padding: 20px;
+}
+</style>

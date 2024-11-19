@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+# generator.py
 import os
 from typing import List
 from config import DEFAULT_CONFIGS
@@ -6,6 +7,7 @@ from generators.model_generator import ModelGenerator
 from generators.bean_generator import BeanGenerator
 from generators.dao_generator import DaoGenerator, BasicDaoGenerator
 from generators.dto_generator import DtoGenerator
+from generators.vue_generator import VueGenerator
 from utils import snake_to_camel
 
 
@@ -16,17 +18,28 @@ class Generator:
         self.table_prefix = DEFAULT_CONFIGS["table_prefix"]
 
     def parse_path(self, path: str) -> tuple:
-        """解析路径，返回(模块名, 表名)"""
-        if not path or '/' not in path:
-            raise ValueError("无效的路径格式，应该是: module_name/table_name")
+        """
+        解析路径，返回(模块名, 表名)
+        如果包含斜杠，则第一部分为模块名；
+        如果没有斜杠，则模块名为空，整个路径为表名
+        """
+        if not path:
+            raise ValueError("路径不能为空")
 
         parts = path.split('/')
-        if len(parts) != 2:
-            raise ValueError("路径格式必须为: module_name/table_name")
-
-        module_name, table_name = parts
-        if not module_name or not table_name:
-            raise ValueError("模块名和表名不能为空")
+        
+        if len(parts) > 2:
+            raise ValueError("路径格式错误，应该是: module_name/table_name 或 table_name")
+            
+        if len(parts) == 2:
+            # 包含模块名: admin/user
+            module_name, table_name = parts
+            if not module_name or not table_name:
+                raise ValueError("模块名和表名不能为空")
+            return module_name, table_name
+        else:
+            # 直接是表名: user
+            return "", parts[0]
 
         return module_name, table_name
 
@@ -75,6 +88,17 @@ class Generator:
             # basic_dao_generator.set_module_name(module_name)
             # basic_dao_generator.set_table_prefix(self.table_prefix)
             # basic_dao_generator.generate()
+
+            # 生成vue
+            vue_generator = VueGenerator(
+                class_name,
+                self.base_paths['vue']
+            )
+            vue_generator.set_mysql_connection(**self.mysql_config)
+            vue_generator.set_module_name(module_name)
+            vue_generator.set_table_prefix(self.table_prefix)
+            vue_generator.generate()
+
 
         except Exception as e:
             print(f"Error generating files: {str(e)}")
