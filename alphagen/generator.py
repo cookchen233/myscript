@@ -7,7 +7,8 @@ from generators.model_generator import ModelGenerator
 from generators.bean_generator import BeanGenerator
 from generators.dao_generator import DaoGenerator, BasicDaoGenerator
 from generators.dto_generator import DtoGenerator
-from generators.vue_generator import VueGenerator
+from generators.vue_edit_generator import VueEditGenerator
+from generators.vue_list_generator import VueListGenerator
 from utils import snake_to_camel
 
 
@@ -89,15 +90,25 @@ class Generator:
             # basic_dao_generator.set_table_prefix(self.table_prefix)
             # basic_dao_generator.generate()
 
-            # 生成vue
-            vue_generator = VueGenerator(
+            # 生成edit.vue
+            vue_edit_generator = VueEditGenerator(
                 class_name,
-                self.base_paths['vue']
+                self.base_paths['vue_edit']
             )
-            vue_generator.set_mysql_connection(**self.mysql_config)
-            vue_generator.set_module_name(module_name)
-            vue_generator.set_table_prefix(self.table_prefix)
-            vue_generator.generate()
+            vue_edit_generator.set_mysql_connection(**self.mysql_config)
+            vue_edit_generator.set_module_name(module_name)
+            vue_edit_generator.set_table_prefix(self.table_prefix)
+            vue_edit_generator.generate()
+            
+            # 生成list.vue
+            vue_list_generator = VueListGenerator(
+                class_name,
+                self.base_paths['vue_list']
+            )
+            vue_list_generator.set_mysql_connection(**self.mysql_config)
+            vue_list_generator.set_module_name(module_name)
+            vue_list_generator.set_table_prefix(self.table_prefix)
+            vue_list_generator.generate()
 
 
         except Exception as e:

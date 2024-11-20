@@ -18,7 +18,8 @@ class BaseGenerator(object):
         os.makedirs(os.path.dirname(self.rendered_file_dir), exist_ok=True)
         self.jinja2_env = jinja2.Environment(loader=jinja2.PackageLoader('resource', 'templates'))
 
-        self.jinja2_env.filters['date'] = format_date  # 注册date过滤器
+        self.jinja2_env.filters['camel_to_snake'] = camel_to_snake
+        self.jinja2_env.filters['snake_to_camel'] = snake_to_camel
 
     def __del__(self):
         if hasattr(self, 'pymysql_connection') and self.pymysql_connection is not None:

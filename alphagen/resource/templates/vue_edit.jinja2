@@ -1,0 +1,210 @@
+<!-- views/{{ module_name }}/{{ table_name|replace('_', '-') }}/edit.vue -->
+<script lang="ts" setup>
+import { ref, reactive, onMounted, computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import type { FormRules } from 'element-plus'
+import { useGlobalProperties } from "@/composables/useGlobalProperties"
+import type { ApiResponse, OptionItem } from '@/types/common'
+import BaseForm from '@/components/base-form.vue'
+import EnumProvider from "@/components/enum/enum-provider.vue"
+import BaseEdit from "@/components/base-edit.vue"
+
+const props = defineProps<{
+  visible?: boolean
+  id?: number | null
+  mode?: 'dialog' | 'page'
+}>()
+
+const emit = defineEmits(['update:visible', 'success', 'cancel'])
+
+const router = useRouter()
+const route = useRoute()
+const { $lc } = useGlobalProperties()
+
+const API = {
+  read: '/{{ module_name }}.{{ class_name }}/read',
+  update: '/{{ module_name }}.{{ class_name }}/update',
+  create: '/{{ module_name }}.{{ class_name }}/create',
+  options: '/{{ module_name }}.Common/options'
+}
+
+const isEdit = computed(() => {
+  if (props.mode === 'dialog') {
+    return !!props.id
+  }
+  return !!props.id || !!route.query.id
+})
+
+const currentId = computed(() => props.id || Number(route.query.id))
+
+{%- if has_area %}
+const areaData = reactive({
+  city_code: null,
+  district_code: null,
+  street_code: null
+})
+{%- endif %}
+
+const formData = reactive({
+{%- for field in form_fields %}
+  {{ field.field }}: {% if field.type == 'enum' %}null{% elif field.type == 'number' %}0{% elif field.type == 'area-selector' %}{}{% elif field.type == 'select-file-multiple' or field.type == 'checkbox-group' %}[]{% else %}''{% endif %},
+{%- endfor %}
+})
+
+const formFields = [
+{%- for field in form_fields %}
+  {
+    label: '{{ field.label }}',
+    prop: '{{ field.field }}',
+    type: '{{ field.type }}',
+    {%- if field.required %}
+    required: true,
+    {%- endif %}
+    props: {
+      {%- if field.type == 'number' %}
+      {%- if field.precision is defined %}
+      precision: {{ field.precision }},
+      {%- endif %}
+      {%- if field.step is defined %}
+      step: {{ field.step }},
+      {%- endif %}
+      {%- if field.min is defined %}
+      min: {{ field.min }},
+      {%- endif %}
+      {%- endif %}
+      {%- if field.type == 'area-selector' %}
+      startLevel: 2,
+      endLevel: 4,
+      parentCode: '440000000000',
+      {%- endif %}
+      {%- if field.type == 'enum' %}
+      field: '{{ field.field|snake_to_camel }}Options',
+      {%- endif %}
+      {%- if field.type == 'textarea' %}
+      rows: {{ field.rows|default(4) }},
+      {%- endif %}
+      {%- if field.type == 'select-file' %}
+      fileType: '{{ field.file_type }}',
+      {%- if field.multiple %}
+      multiple: true,
+      limit: {{ field.limit|default(15) }},
+      {%- endif %}
+      {%- endif %}
+      class: 'w-[{{ field.width|default(320) }}px]'
+    }
+  },
+{%- endfor %}
+]
+
+// Form validation rules
+const rules: FormRules = {
+{%- for field in form_fields %}
+{%- if field.required %}
+  {{ field.field }}: [
+    {%- if field.type == 'area-selector' %}
+    {
+      required: true,
+      validator: (rule, value, callback) => {
+        if (!value) {
+          callback(new Error('请选择城市'))
+          return
+        }
+
+        const { city_code, district_code, street_code } = value
+
+        if (!city_code) {
+          callback(new Error('请选择城市'))
+          return
+        }
+
+        if (!district_code) {
+          callback(new Error('请选择区县'))
+          return
+        }
+
+        if (!street_code) {
+          callback(new Error('请选择街道'))
+          return
+        }
+
+        formData.city_code = city_code
+        formData.district_code = district_code
+        formData.street_code = street_code
+
+        callback()
+      },
+      trigger: ['change', 'blur']
+    }
+    {%- else %}
+    { required: true, message: '请输入{{ field.label }}', trigger: '{{ 'change' if field.type in ['select', 'enum-selector', 'date-picker'] else 'blur' }}' }
+    {%- endif %}
+  ],
+{%- endif %}
+{%- endfor %}
+}
+
+const loadData = async () => {
+  if (!currentId.value) return
+
+  try {
+    const res = await $lc.get<ApiResponse<any>>(API.read, { id: currentId.value })
+    if (res.code === 1 && res.data) {
+      Object.assign(formData, res.data)
+    }
+  } catch (error) {
+    console.error('获取详情失败:', error)
+    ElMessage.error('获取详情失败')
+  }
+}
+
+const handleSubmit = async () => {
+  try {
+    const url = isEdit.value ? API.update : API.create
+    const data = isEdit.value ? { ...formData, id: currentId.value } : formData
+    const res = await $lc.post<ApiResponse<null>>(url, data)
+
+    if (res.code === 1) {
+      ElMessage.success(isEdit.value ? '编辑成功' : '添加成功')
+      emit('success')
+    }
+  } catch (error) {
+    console.error(isEdit.value ? '编辑失败:' : '添加失败:', error)
+    ElMessage.error(isEdit.value ? '编辑失败' : '添加失败')
+  }
+}
+
+const handleCancel = () => {
+  if (props.mode === 'page') {
+    router.back()
+  } else {
+    emit('update:visible', false)
+  }
+  emit('cancel')
+}
+
+onMounted(async () => {
+  if (currentId.value) {
+    await loadData()
+  }
+})
+</script>
+
+<template>
+  <enum-provider 
+    url="/{{ module_name }}.Common/options" 
+    :fields="[{% for field in enum_fields %}'{{ field.options_name }}'{{ ', ' if not loop.last }}{% endfor %}]"
+  >
+    <base-edit
+      v-model="formData"
+      :fields="formFields"
+      :rules="rules"
+      :title="isEdit ? '编辑{{ table_comment }}' : '添加{{ table_comment }}'"
+      :mode="props.mode"
+      :visible="props.visible"
+      @update:visible="(val) => emit('update:visible', val)"
+      @submit="handleSubmit"
+      @cancel="handleCancel"
+    />
+  </enum-provider>
+</template>
