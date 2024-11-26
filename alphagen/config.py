@@ -2,6 +2,7 @@
 DEFAULT_CONFIGS = {
     'paths': {
         'model': "/Users/Chen/Coding/phpcode/app/common/model",
+        'controller': "/Users/Chen/Coding/phpcode/app/admin/controller",
         'bean': "/Users/Chen/Coding/phpcode/app/common/bean",
         'dao': "/Users/Chen/Coding/phpcode/app/common/dao",
         'basic_dao': "/Users/Chen/Coding/phpcode/app/common/dao",

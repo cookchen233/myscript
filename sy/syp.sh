@@ -15,22 +15,31 @@ export LC_ALL=C
 export LANG=C
 
 # 创建临时目录用于缓存
-CACHE_DIR="/tmp/sync_script_cache"
+# 获取项目根目录的唯一标识(使用目录路径的哈希值)
+PROJECT_HASH=$((pwd | md5) || (pwd | md5sum) | cut -d' ' -f1)
+CACHE_DIR="${HOME}/.cache/sync_script/${PROJECT_HASH}"
+# 确保缓存目录存在
 mkdir -p "$CACHE_DIR"
+
+cleanup() {
+    # 删除临时文件
+    rm -f "$SYNC_STATUS_FILE" "$GIT_STATUS_FILE" "$GIT_ERROR_FILE" "$RSYNC_ERROR_FILE"
+    
+    # 清理过期的缓存文件(比如7天前的)
+    find "$CACHE_DIR" -type f -mtime +7 -delete 2>/dev/null
+    
+    # 清理SSH连接
+    if [[ -n "$REMOTE_USER" && -n "$REMOTE_IP" && -n "$PORT" ]]; then
+        ssh -O stop -o ControlPath="$SSH_CONTROL_PATH" -p "$PORT" "$REMOTE_USER@$REMOTE_IP" 2>/dev/null
+    fi
+}
+trap cleanup EXIT
 
 # 创建临时文件用于同步状态
 SYNC_STATUS_FILE=$(mktemp)
 GIT_STATUS_FILE=$(mktemp)
 GIT_ERROR_FILE=$(mktemp)
 RSYNC_ERROR_FILE=$(mktemp)
-
-cleanup() {
-    rm -f "$SYNC_STATUS_FILE" "$GIT_STATUS_FILE" "$GIT_ERROR_FILE" "$RSYNC_ERROR_FILE"
-    if [[ -n "$REMOTE_USER" && -n "$REMOTE_IP" && -n "$PORT" ]]; then
-        ssh -O stop -o ControlPath="$SSH_CONTROL_PATH" -p "$PORT" "$REMOTE_USER@$REMOTE_IP" 2>/dev/null
-    fi
-}
-trap cleanup EXIT
 
 # SSH控制主连接
 setup_ssh_controlmaster() {
@@ -487,7 +496,8 @@ main() {
 
     # 先进行用户确认
     if [ "$is_all" == true ]; then
-        read -p "是否要进行全量同步？(将覆盖服务器所有文件，请注意某些文件对服务器的影响，如 .env, /runtime, /node_modules, /logs 等) [y/n]: " choice
+        # read -p "是否要进行全量同步？(将覆盖服务器所有文件，请注意某些文件对服务器的影响，如 .env, /runtime, /node_modules, /logs 等) [y/n]: " choice
+        choice="y"
         if ! { [ -z "$choice" ] || [ "$choice" = "y" ] || [ "$choice" = "Y" ]; }; then
             echo -e "\033[1;31m已放弃同步\033[1;0m"
             $branch_switched && switch_back "$branch" "$target" "$has_remote_branch"

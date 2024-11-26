@@ -1,5 +1,6 @@
+<!-- views/{{ module_name }}/{{ table_name|replace('_', '-') }}/list.vue -->
 <script lang="ts" setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, PropType, reactive, ref } from 'vue'
 import { Search } from '@element-plus/icons-vue'
 import BaseList from '@/components/base-list.vue'
 import EnumSelector from "@/components/enum/enum-selector.vue"
@@ -7,11 +8,27 @@ import EnumLabel from "@/components/enum/enum-label.vue"
 import EnumStatusLabel from "@/components/enum/enum-status-label.vue"
 import {{ class_name }}Edit from './edit.vue'
 import EnumProvider from "@/components/enum/enum-provider.vue"
+import {useGlobalProperties} from "@/composables/useGlobalProperties";
+import {useRoute} from "vue-router";
 
-// API配置
+const props = defineProps({
+  belongToId: {
+    type: Number,
+    required: true
+  },
+  mode: {
+    type: String as PropType<'dialog' | 'page'>,
+    default: 'page'
+  }
+})
+
+const { $lc } = useGlobalProperties()
+const route = useRoute()
+
 const API = {
   list: '/{{ module_name }}.{{ class_name }}/list',
   delete: '/{{ module_name }}.{{ class_name }}/delete',
+  update: '/{{ module_name }}.{{ class_name }}/update',
   {%- if has_delete %}
   restore: '/{{ module_name }}.{{ class_name }}/restore',
   restoreBatch: '/{{ module_name }}.{{ class_name }}/restoreBatch',
@@ -19,180 +36,111 @@ const API = {
 }
 
 const baseListRef = ref<InstanceType<typeof BaseList> | null>(null)
+const showRestore = computed(() => query.is_trashed)
 
 // 查询条件
 const query = reactive({
   keywords: '',
+  belongToId: props.belongToId || route.query.belongToId, // 这里要改请求参数名
   {%- for field in search_fields %}
-  {%- if field.type == 'daterange' %}
-  {{ field.start_field }}: '',
-  {{ field.end_field }}: '',
-  {%- elif field.type == 'numberrange' %}
-  {{ field.start_field }}: null,
-  {{ field.end_field }}: null,
+  {%- if field.type == 'daterange' or field.type == 'numberrange' %}
+  {{ field.field }}_range: [],
   {%- else %}
   {{ field.field }}: null,
   {%- endif %}
   {%- endfor %}
-  create_time_start: '',  // 添加创建时间范围
-  create_time_end: '',
   {%- if has_delete %}
-  is_trashed: false
+  is_trashed: false,
   {%- endif %}
 })
 
-// 日期范围
-const dateRange = ref<[string, string] | null>(null)
-{%- if has_delete %}
-    const showRestore = computed(() => query.is_trashed)
-{%- endif %}
+const resetQuery = (newVal) => {
+  Object.assign(query, {
+    ...newVal
+  })
+}
 
-// 日期范围变化处理
-const handleDateRangeChange = (val: [string, string] | null) => {
-  if (val) {
-    query.create_time_start = val[0]
-    query.create_time_end = val[1]
-  } else {
-    query.create_time_start = ''
-    query.create_time_end = ''
+const handleUpdate = async (row: any, updateData: any) => {
+  const url = API.update
+  const data = {
+    id: row.id,
+    ...updateData
   }
+  await $lc.submit(url, data)
 }
 
 {%- for field in search_fields %}
 {%- if field.type == 'daterange' %}
-const {{ field.model }} = ref<[string, string] | null>(null)
-const handle{{ field.model|capitalize }}Change = (val: [string, string] | null) => {
-  if (val) {
-    query.{{ field.start_field }} = val[0]
-    query.{{ field.end_field }} = val[1]
-  } else {
-    query.{{ field.start_field }} = ''
-    query.{{ field.end_field }} = ''
-  }
-}
+const {{ field.field|snake_to_camel }}Range = ref<[string, string] | null>(null)
+const handle{{ field.field|snake_to_camel(True) }}RangeChange = (val: [string, string] | null) => { query.{{ field.field }}_range = val ? val : [] }
+{%- elif field.type == 'numberrange' %}
+const {{ field.field|snake_to_camel }}Range = ref<[number, number] | null>(null)
+const handle{{ field.field|snake_to_camel(True) }}RangeChange = (val: [number, number] | null) => { query.{{ field.field }}_range = val ? val : [] }
 {%- endif %}
 {%- endfor %}
 </script>
 
 <template>
-  <enum-provider 
-    url="/{{ module_name }}.Common/options" 
-    :fields="[{% for field in enum_fields %}'{{ field.options_name }}'{{ ', ' if not loop.last }}{% endfor %}]"
-  >
-    <BaseList
-      :api="API"
-      title="{{ table_comment }}"
-      :edit-component="{{ class_name }}Edit"
-      :initial-query="query"
-      ref="baseListRef"
+  <enum-provider url="/{{ module_name }}.Common/options" :fields="[{% for field in enum_fields %}
+  '{{ field.options_name }}'{{ ', ' if not loop.last }}
+  {% endfor %}]">
+    <BaseList 
+    :api="API" 
+    :edit-component="{{ class_name }}Edit" 
+    :query="query"
+    :reset-query="resetQuery"
+    ref="baseListRef" 
+    title="{{ table_comment }}"
     >
-      <!-- 搜索表单项 -->
       <template #search-items>
-        <!-- 关键字搜索 -->
         <el-form-item label="搜索" class="mt-[20px]">
-          <el-input
-            v-model="query.keywords"
-            class="w-[420px]"
-            placeholder="请输入关键字"
-            :prefix-icon="Search"
-          />
+          <el-input v-model="query.keywords" class="w-[200px]" placeholder="请输入关键字" :prefix-icon="Search" clearable />
         </el-form-item>
 
         {%- for field in search_fields %}
         {%- if field.field != 'keywords' %}
-        <!-- {{ field.label }} -->
         <el-form-item label="{{ field.label }}" class="mt-[20px]">
           {%- if field.type == 'enum' %}
-          <enum-selector
-            v-model="query.{{ field.field }}"
-            field="{{ field.field|snake_to_camel }}Options"
-            class="w-[{{ field.width|default(200) }}px]"
-          />
+          <enum-selector v-model="query.{{ field.field }}" field="{{ field.field|snake_to_camel }}Options" class="w-[{{ field.width|default(200) }}px]" clearable />
           {%- elif field.type == 'daterange' %}
-          <el-date-picker
-            v-model="{{ field.model }}"
-            type="daterange"
-            range-separator="至"
-            start-placeholder="开始日期"
-            end-placeholder="结束日期"
-            value-format="YYYY-MM-DD"
-            @change="handle{{ field.model|capitalize }}Change"
-          />
+          <el-date-picker v-model="query.{{ field.field }}_range" type="daterange" range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期" value-format="YYYY-MM-DD" class="w-[360px]" clearable />
           {%- elif field.type == 'numberrange' %}
-          <div class="flex items-center gap-2">
-            <el-input-number
-              v-model="query.{{ field.start_field }}"
-              class="!w-[120px]"
-              placeholder="最小值"
-              {%- if field.min is defined %}
-              :min="{{ field.min }}"
-              {%- endif %}
-              clearable
-            />
-            <span>-</span>
-            <el-input-number
-              v-model="query.{{ field.end_field }}"
-              class="!w-[120px]"
-              placeholder="最大值"
-              {%- if field.min is defined %}
-              :min="{{ field.min }}"
-              {%- endif %}
-              clearable
-            />
-          </div>
+          <el-input-number-range v-model="{{ field.field }}Range" @change="handle{{ field.field|snake_to_camel(True) }}RangeChange" class="w-[260px]" {% if field.min is defined %}:min="{{ field.min }}"{% endif %} {% if field.precision is defined %}:precision="{{ field.precision }}"{% endif %} clearable />
+          {%- elif field.type == 'switch' %}
+          <el-select v-model="query.{{ field.field }}" class="w-[100px]" clearable placeholder="请选择"><el-option :value="1" label="开启" /><el-option :value="0" label="关闭" /></el-select>
           {%- else %}
-          <el-input-number
-            v-model="query.{{ field.field }}"
-            class="!w-[{{ field.width|default(120) }}px]"
-            placeholder="请输入{{ field.label }}"
-            {%- if field.min is defined %}
-            :min="{{ field.min }}"
-            {%- endif %}
-            clearable
-          />
+          <el-input-number v-model="query.{{ field.field }}" class="!w-[{{ field.width|default(120) }}px]" placeholder="请输入{{ field.label }}" {% if field.min is defined %}:min="{{ field.min }}"{% endif %} {% if field.precision is defined %}:precision="{{ field.precision }}"{% endif %} clearable />
           {%- endif %}
         </el-form-item>
         {%- endif %}
         {%- endfor %}
-
-        <!-- 创建时间范围 -->
-        <el-form-item label="创建时间" class="mt-[20px]">
-          <el-date-picker
-            v-model="dateRange"
-            type="daterange"
-            range-separator="至"
-            start-placeholder="开始日期"
-            end-placeholder="结束日期"
-            value-format="YYYY-MM-DD"
-            @change="handleDateRangeChange"
-          />
-        </el-form-item>
       </template>
 
-      <!-- 表格列定义 -->
       {%- for field in table_fields %}
-      <el-table-column prop="{{ field.field }}" label="{{ field.label }}"{%- if field.width %} width="{{ field.width }}"{%- endif %}{%- if field.align %} align="{{ field.align }}"{%- endif %}>{%- if field.type %}
+      <el-table-column prop="{{ field.field }}" label="{{ field.label }}" {% if field.width %} width="{{ field.width }}"{% endif %}{% if field.align %} align="{{ field.align }}"{% endif %}{% if field.type == 'text' %} show-overflow-tooltip{% endif %} {{ field.type }}>
+        {%- if field.type %}
         <template #default="{row}">
           {%- if field.type == 'enum' %}
           <enum-label field="{{ field.field|snake_to_camel }}Options" :value="row.{{ field.field }}"/>
           {%- elif field.type == 'datetime' %}
           {{ '{{ row.' + field.field + ' }}' }}
           {%- elif field.type == 'money' %}
-          ¥{{ '{{ row.' + field.field + ' }}' }}
+          <span class="text-orange-500">¥{{ '{{ row.' + field.field + ' }}' }}</span>
           {%- elif field.type == 'image' %}
-          <el-image
-            v-if="row.{{ field.field }}"
-            :src="row.{{ field.field }}"
-            :preview-src-list="[row.{{ field.field }}]"
-            style="width: 80px; height: 60px"
-            fit="cover"
-          />
+          <el-image v-if="row.{{ field.field }}" :src="row.{{ field.field }}" :preview-src-list="[row.{{ field.field }}]" style="width: 80px; height: 60px" fit="cover"/>
+          {%- elif field.type == 'switch2' %}
+          <el-tag :type="row.{{ field.field }} ? 'success' : 'danger'" size="small">{{ '{{ row.' + field.field + ' ? "启用" : "禁用" }}' }}</el-tag>
+          {%- elif field.type == 'switch' %}
+          <el-switch v-model="row.is_enabled" :active-value="1" :inactive-value="0" @change="(value)=> handleUpdate(row, value)" />
+          {%- elif field.type == 'textarea' %}
+          <el-tooltip :content="row.{{ field.field }}" placement="top" :hide-after="2000"><span>{{ '{{ row.' + field.field + ' }}' }}</span></el-tooltip>
           {%- endif %}
         </template>
-      {% endif -%}</el-table-column>
+      {% endif -%}
+      </el-table-column>
       {%- endfor %}
 
-        {%- if has_delete %}
+      {%- if has_delete %}
       <el-table-column prop="delete_time" label="删除时间" width="180" v-if="showRestore"/>
       {%- endif %}
     </BaseList>

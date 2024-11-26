@@ -12,8 +12,25 @@ export LC_ALL=C
 export LANG=C
 
 # 创建临时目录用于缓存
-CACHE_DIR="/tmp/sync_script_cache"
+# 获取项目根目录的唯一标识(使用目录路径的哈希值)
+PROJECT_HASH=$((pwd | md5) || (pwd | md5sum) | cut -d' ' -f1)
+CACHE_DIR="${HOME}/.cache/sync_script/${PROJECT_HASH}"
+# 确保缓存目录存在
 mkdir -p "$CACHE_DIR"
+
+cleanup() {
+    # 删除临时文件
+    rm -f "$SYNC_STATUS_FILE" "$GIT_STATUS_FILE" "$GIT_ERROR_FILE" "$RSYNC_ERROR_FILE"
+    
+    # 清理过期的缓存文件(比如7天前的)
+    find "$CACHE_DIR" -type f -mtime +7 -delete 2>/dev/null
+    
+    # 清理SSH连接
+    if [[ -n "$REMOTE_USER" && -n "$REMOTE_IP" && -n "$PORT" ]]; then
+        ssh -O stop -o ControlPath="$SSH_CONTROL_PATH" -p "$PORT" "$REMOTE_USER@$REMOTE_IP" 2>/dev/null
+    fi
+}
+trap cleanup EXIT
 
 # SSH控制主连接
 setup_ssh_controlmaster() {
@@ -375,7 +392,8 @@ for file in "${special_perm_files[@]}"; do
 done
 
 if [ "$is_all" == true ]; then
-    read -p "是否要进行全量同步？(将覆盖服务器所有文件, 请注意某些文件对服务器的影响, 如 .env, /runtime, /node_modules, /logs 等) [Y/n]: " choice
+    # read -p "是否要进行全量同步？(将覆盖服务器所有文件, 请注意某些文件对服务器的影响, 如 .env, /runtime, /node_modules, /logs 等) [Y/n]: " choice
+    choice="y"
     if [ -z "$choice" ] || [[ $choice =~ ^[Yy]$ ]]; then
         # 初始化排除项
         declare -a exclude_items=(

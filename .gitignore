@@ -46,6 +46,8 @@ pnpm-lock.yaml
 /log
 /logs
 **/*.log
+**/*.log.*
+/aaa-*
 *.pid
 *.cache
 *.bak

@@ -4,6 +4,7 @@ import os
 from typing import List
 from config import DEFAULT_CONFIGS
 from generators.model_generator import ModelGenerator
+from generators.controller_generator import ControllerGenerator
 from generators.bean_generator import BeanGenerator
 from generators.dao_generator import DaoGenerator, BasicDaoGenerator
 from generators.dto_generator import DtoGenerator
@@ -17,6 +18,11 @@ class Generator:
         self.base_paths = DEFAULT_CONFIGS['paths']
         self.mysql_config = DEFAULT_CONFIGS['mysql']
         self.table_prefix = DEFAULT_CONFIGS["table_prefix"]
+
+        self.force = False
+
+    def set_force(self, force):
+        self.force = force
 
     def parse_path(self, path: str) -> tuple:
         """
@@ -58,7 +64,19 @@ class Generator:
             model_generator.set_mysql_connection(**self.mysql_config)
             model_generator.set_module_name(module_name)
             model_generator.set_table_prefix(self.table_prefix)
+            model_generator.set_force(self.force)
             model_generator.generate()
+
+            # 生成控制器
+            controller_generator = ControllerGenerator(
+                class_name,
+                os.path.join(self.base_paths['controller'], module_name)
+            )
+            controller_generator.set_mysql_connection(**self.mysql_config)
+            controller_generator.set_module_name(module_name)
+            controller_generator.set_table_prefix(self.table_prefix)
+            controller_generator.set_force(self.force)
+            controller_generator.generate()
 
             # 生成Bean
             # bean_generator = BeanGenerator(
@@ -68,6 +86,7 @@ class Generator:
             # bean_generator.set_mysql_connection(**self.mysql_config)
             # bean_generator.set_module_name(module_name)
             # bean_generator.set_table_prefix(self.table_prefix)
+            # model_generator.set_force(self.force)
             # bean_generator.generate()
 
             # 生成Dao
@@ -78,6 +97,7 @@ class Generator:
             # dao_generator.set_mysql_connection(**self.mysql_config)
             # dao_generator.set_module_name(module_name)
             # dao_generator.set_table_prefix(self.table_prefix)
+            # dao_generator.set_force(self.force)
             # dao_generator.generate()
 
             # 生成BasicDao
@@ -88,6 +108,7 @@ class Generator:
             # basic_dao_generator.set_mysql_connection(**self.mysql_config)
             # basic_dao_generator.set_module_name(module_name)
             # basic_dao_generator.set_table_prefix(self.table_prefix)
+            # basic_dao_generator.set_force(self.force)
             # basic_dao_generator.generate()
 
             # 生成edit.vue
@@ -98,6 +119,7 @@ class Generator:
             vue_edit_generator.set_mysql_connection(**self.mysql_config)
             vue_edit_generator.set_module_name(module_name)
             vue_edit_generator.set_table_prefix(self.table_prefix)
+            vue_edit_generator.set_force(self.force)
             vue_edit_generator.generate()
             
             # 生成list.vue
@@ -108,6 +130,7 @@ class Generator:
             vue_list_generator.set_mysql_connection(**self.mysql_config)
             vue_list_generator.set_module_name(module_name)
             vue_list_generator.set_table_prefix(self.table_prefix)
+            vue_list_generator.set_force(self.force)
             vue_list_generator.generate()
 
 

@@ -4,6 +4,7 @@ from .dao_generator import DaoGenerator, BasicDaoGenerator
 from .dto_generator import DtoGenerator
 from .vue_edit_generator import VueEditGenerator
 from .vue_list_generator import VueListGenerator
+from .controller_generator import ControllerGenerator
 
 __all__ = [
     'ModelGenerator',
@@ -13,4 +14,5 @@ __all__ = [
     'DtoGenerator'
     'VueEditGenerator'
     'VueListGenerator'
+    'ControllerGenerator'
 ]

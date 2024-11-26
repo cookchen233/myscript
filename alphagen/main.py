@@ -9,9 +9,13 @@ def main():
     parser.add_argument('--dto', action='store_true', help='仅生成DTO文件')
     parser.add_argument('--comment', help='类注释 (仅用于DTO)')
     parser.add_argument('--properties', help='属性定义 (仅用于DTO)')
+    parser.add_argument('--force', '-f', action='store_true', help='强制覆盖已存在的文件')
 
     args = parser.parse_args()
     generator = Generator()
+    
+    # 设置force选项
+    generator.set_force(args.force)
 
     if args.dto:
         if not args.comment or not args.properties:

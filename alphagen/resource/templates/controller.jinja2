@@ -1,0 +1,22 @@
+<?php
+declare(strict_types=1);
+
+namespace app\admin\controller{% if module_name %}\{{ module_name }}{% endif %};
+{% if module_name %}
+use app\admin\controller\CrudController;{% endif %}
+
+use app\common\model\bb\{{class_name}}Model;
+
+/**
+ * {{table_comment}}
+ * @generated {{ datetime.now().strftime('%Y-%m-%d %H:%M:%S') }}
+*/
+class {{class_name}} extends CrudController
+{
+    protected function initialize()
+    {
+        parent::initialize();
+        $this->model = new {{class_name}}Model();
+    }
+
+}

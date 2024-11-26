@@ -21,6 +21,11 @@ class BaseGenerator(object):
         self.jinja2_env.filters['camel_to_snake'] = camel_to_snake
         self.jinja2_env.filters['snake_to_camel'] = snake_to_camel
 
+        self.force = False  # 添加force属性
+
+    def set_force(self, force):
+        self.force = force
+
     def __del__(self):
         if hasattr(self, 'pymysql_connection') and self.pymysql_connection is not None:
             self.pymysql_connection.close()

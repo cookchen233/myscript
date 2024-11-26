@@ -24,7 +24,8 @@ class ModelGenerator(BaseGenerator):
             class_name=self.file_name,
             model_variable_name="$" + snake_to_camel(camel_to_snake(self.file_name)),
             table_comment=self._get_table_status(table_name, "Comment"),
-            properties=self._get_model_properties(table_name)
+            properties=self._get_model_properties(table_name),
+            datetime=datetime  # 添加 datetime 对象
         )
 
     def _get_model_properties(self, table_name):
@@ -120,21 +121,6 @@ class ModelGenerator(BaseGenerator):
             with open(filename, "w", encoding='utf-8') as f:
                 f.write(rendered)
                 print(f'Successfully generated new file: {filename}')
-
-    def get_template_variables(self):
-        base_name = self.file_name.replace("Model", "")
-        table_name = self.table_prefix + camel_to_snake(base_name)
-
-        return dict(
-            table_name=table_name,
-            table_prefix=self.table_prefix,
-            module_name=self.module_name,
-            class_name=self.file_name,
-            model_variable_name="$" + snake_to_camel(camel_to_snake(self.file_name)),
-            table_comment=self._get_table_status(table_name, "Comment"),
-            properties=self._get_model_properties(table_name),
-            datetime=datetime  # 添加 datetime 对象
-        )
 
     def set_module_name(self, module_name):
         self.module_name = module_name
