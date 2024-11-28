@@ -1,0 +1,32 @@
+<?php
+namespace app\common\enum{% if module_name %}\{{ module_name }}{% endif %};
+
+use app\common\enum\Enum;
+
+/**
+{%- for enum in enums %}
+ * {{ enum.comment }}
+{%- endfor %}
+ */
+class {{ class_name }} extends Enum
+{
+
+{%- for enum in enums -%}
+{% for value in enum.enum_items %}
+    const {{ value.constant_name }} = {{ value.key }};
+{%- endfor -%}
+{% endfor %}
+
+    // 枚举对应的描述
+    public static function getValuesWithText(): array
+    {
+        return [
+{%- for enum in enums -%}
+{% for value in enum.enum_items %}
+            self::{{ value.constant_name }} => '{{ value.value }}',
+{%- endfor -%}
+{% endfor %}
+        ];
+    }
+
+}

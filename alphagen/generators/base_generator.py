@@ -63,6 +63,21 @@ class BaseGenerator(object):
             print(f"数据库连接信息: {self.pymysql_connection.get_host_info()}")
             raise
 
+    def clean_comment(self,comment):
+        """
+        Clean comment by removing enum-like descriptions in square brackets
+        Example: "日志类型[1:类型1, 2:类型2, 3:xx]" -> "日志类型"
+        """
+        if not comment:
+            return comment
+            
+        # Find first [ character position
+        bracket_start = comment.find('[')
+        if bracket_start != -1:
+            return comment[:bracket_start].strip()
+        
+        return comment.strip()
+
     def _get_rows_from_cursor(self, cursor):
         column_names = [column[0] for column in cursor.description]
         result = cursor.fetchall()
@@ -100,11 +115,10 @@ class BaseGenerator(object):
         header = f"""<?php
 /**
  * This file is auto-generated.
- * 
+ * If delete the tag "@generated", it would not be generated again.
  * @generated {now}
  * @generator AlphaGenerator
  */
-
 """
         return header + content.lstrip('<?php')
 

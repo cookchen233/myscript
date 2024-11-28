@@ -145,7 +145,7 @@ class VueEditGenerator(BaseGenerator):
             
             field_config = {
                 "field": field_name,
-                "label": field["Comment"] or field_name,
+                "label": self.clean_comment(field["Comment"]) or field_name,
                 "required": "NO" in field["Null"],
                 "prop": snake_to_camel(field_name),
                 "form_type": form_type,

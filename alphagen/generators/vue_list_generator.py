@@ -120,7 +120,7 @@ class VueListGenerator(BaseGenerator):
             
             field_config = {
                 "field": field_name,
-                "label": field["Comment"] or field_name,
+                "label": self.clean_comment(field["Comment"]) or field_name,
                 "prop": snake_to_camel(field_name)
             }
             
@@ -152,13 +152,13 @@ class VueListGenerator(BaseGenerator):
         search_fields = []
         
         # 添加关键字搜索
-        search_fields.append({
-            "field": "keywords",
-            "label": "搜索",
-            "type": "text",
-            "width": 420,
-            "placeholder": "请输入关键字"
-        })
+        # search_fields.append({
+        #     "field": "keywords",
+        #     "label": "搜索",
+        #     "type": "text",
+        #     "width": 420,
+        #     "placeholder": "请输入关键字"
+        # })
         
         for field in self._get_table_schema(table_name):
             field_name = field["Field"].lower()
@@ -169,7 +169,7 @@ class VueListGenerator(BaseGenerator):
                 
             field_config = {
                 "field": field_name,
-                "label": field["Comment"] or field_name,
+                "label": self.clean_comment(field["Comment"]) or field_name,
                 "type": search_type
             }
             

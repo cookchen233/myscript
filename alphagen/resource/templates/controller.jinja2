@@ -5,7 +5,7 @@ namespace app\admin\controller{% if module_name %}\{{ module_name }}{% endif %};
 {% if module_name %}
 use app\admin\controller\CrudController;{% endif %}
 
-use app\common\model\bb\{{class_name}}Model;
+use app\common\model{% if module_name %}\{{ module_name }}{% endif %}\{{class_name}}Model;
 
 /**
  * {{table_comment}}

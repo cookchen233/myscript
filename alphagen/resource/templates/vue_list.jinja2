@@ -10,6 +10,8 @@ import {{ class_name }}Edit from './edit.vue'
 import EnumProvider from "@/components/enum/enum-provider.vue"
 import {useGlobalProperties} from "@/composables/useGlobalProperties";
 import {useRoute} from "vue-router";
+//import XxList from '../xx/list.vue'
+
 
 const props = defineProps({
   belongToId: {
@@ -41,7 +43,7 @@ const showRestore = computed(() => query.is_trashed)
 // 查询条件
 const query = reactive({
   keywords: '',
-  belongToId: props.belongToId || route.query.belongToId, // 这里要改请求参数名
+  belongToId: props.belongToId || route.query.belongToId, // 用于父组件调用,这里要改请求参数名
   {%- for field in search_fields %}
   {%- if field.type == 'daterange' or field.type == 'numberrange' %}
   {{ field.field }}_range: [],
@@ -101,7 +103,7 @@ const handle{{ field.field|snake_to_camel(True) }}RangeChange = (val: [number, n
         {%- if field.field != 'keywords' %}
         <el-form-item label="{{ field.label }}" class="mt-[20px]">
           {%- if field.type == 'enum' %}
-          <enum-selector v-model="query.{{ field.field }}" field="{{ field.field|snake_to_camel }}Options" class="w-[{{ field.width|default(200) }}px]" clearable />
+          <enum-selector v-model="query.{{ field.field }}" field="{{ field.field|snake_to_camel }}Options" class="w-[{{ field.width|default(200) }}px]" clearable :filterable="true" />
           {%- elif field.type == 'daterange' %}
           <el-date-picker v-model="query.{{ field.field }}_range" type="daterange" range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期" value-format="YYYY-MM-DD" class="w-[360px]" clearable />
           {%- elif field.type == 'numberrange' %}
@@ -145,4 +147,7 @@ const handle{{ field.field|snake_to_camel(True) }}RangeChange = (val: [number, n
       {%- endif %}
     </BaseList>
   </enum-provider>
+<!--  <el-dialog v-model="dialogVisible" title="列表" width="80%" destroy-on-close >-->
+<!--    <Xx :belong-to-id="currentId"/>-->
+<!--  </el-dialog>-->
 </template>

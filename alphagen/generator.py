@@ -10,6 +10,7 @@ from generators.dao_generator import DaoGenerator, BasicDaoGenerator
 from generators.dto_generator import DtoGenerator
 from generators.vue_edit_generator import VueEditGenerator
 from generators.vue_list_generator import VueListGenerator
+from generators.enum_generator import EnumGenerator
 from utils import snake_to_camel
 
 
@@ -55,6 +56,9 @@ class Generator:
         try:
             module_name, table_name = self.parse_path(path)
             class_name = snake_to_camel(table_name, True)  # 转换表名为驼峰形式
+
+            # 生成枚举（添加在其他生成器之前）
+            self.generate_enum(path)
 
             # 生成Model
             model_generator = ModelGenerator(
@@ -136,6 +140,45 @@ class Generator:
 
         except Exception as e:
             print(f"Error generating files: {str(e)}")
+            raise
+
+    def generate_enum(self, path: str) -> None:
+        """根据传入的模块名和表名生成对应表中的枚举类"""
+        try:
+            module_name, table_name = self.parse_path(path)
+            table_name_with_prefix = self.table_prefix + table_name  # 加上表前缀
+            
+            # 创建枚举生成器实例来检查表结构
+            temp_generator = EnumGenerator("TempEnum")
+            temp_generator.set_mysql_connection(**self.mysql_config)
+            temp_generator.set_table_name(table_name)  # 设置完整的表名
+            
+            # 直接使用完整表名获取枚举字段
+            enum_fields = temp_generator._get_enum_fields(table_name_with_prefix)
+            
+            # 只有当存在枚举字段时才生成对应的枚举类
+            if enum_fields:
+                for field in enum_fields:
+                    # 为每个枚举字段生成一个独立的枚举类
+                    enum_class_name = snake_to_camel(field['field_name'], True) + ""
+                    
+                    enum_generator = EnumGenerator(
+                        enum_class_name,
+                        os.path.join(self.base_paths['enum'], module_name)
+                    )
+                    enum_generator.set_mysql_connection(**self.mysql_config)
+                    enum_generator.set_module_name(module_name)
+                    enum_generator.set_table_prefix(self.table_prefix)
+                    enum_generator.set_table_name(table_name)  # 设置完整的表名
+                    enum_generator.set_force(self.force)
+                    enum_generator.generate()
+                    
+                    print(f"Generated enum class for field: {field['field_name']}")
+            else:
+                print(f"No enum fields found in table: {table_name_with_prefix}")
+
+        except Exception as e:
+            print(f"Error generating enum files: {str(e)}")
             raise
 
     def generate_dto(self, path: str, comment: str, properties: str) -> None:
