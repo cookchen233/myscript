@@ -1,3 +1,4 @@
+# vue_edit_generator.py
 from datetime import datetime
 import os
 from .base_generator import BaseGenerator, camel_to_snake, snake_to_camel
@@ -18,15 +19,15 @@ class VueEditGenerator(BaseGenerator):
         if "area" in field_name or "region" in field_name:
             return "area-selector"
         if "img" in field_name:
-            return "image"
+            return "select-image"
         if "imgs" in field_name or "images" in field_name:
-            return "image"
+            return "select-image"
         if "file" in field_name:
-            return "file"
+            return "select-file"
+        if "time" in field_name or "time" in form_type:
+            return "date-picker"
         if "date" in field_name or "date" in form_type:
             return "date-picker"
-        if "time" in field_name or "time" in form_type:
-            return "datetime-picker"
         if "content" in field_name or "desc" in field_name or "remark" in field_name:
             return "textarea"
                 
@@ -195,16 +196,16 @@ class VueEditGenerator(BaseGenerator):
                         "disabled": "!!formData.source_id" if field_name == "total_rooms" else None
                     })
                 
-            elif form_type == "image":
+            elif form_type == "select-image":
                 props.update({
-                    "fileType": "image",
+                    "type": "image",
                     "multiple": "imgs" in field_name or "images" in field_name,
                     "limit": 15 if "imgs" in field_name or "images" in field_name else 1
                 })
                 
-            elif form_type == "file":
+            elif form_type == "select-file":
                 props.update({
-                    "fileType": "image",
+                    "type": "image",
                     "multiple": "imgs" in field_name or "images" in field_name,
                     "limit": 15 if "imgs" in field_name or "images" in field_name else 1
                 })
