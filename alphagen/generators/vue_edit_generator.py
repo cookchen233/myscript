@@ -3,6 +3,7 @@ from datetime import datetime
 import os
 from .base_generator import BaseGenerator, camel_to_snake, snake_to_camel
 
+
 class VueEditGenerator(BaseGenerator):
     def get_template_name(self):
         return "vue_edit.jinja2"
@@ -10,11 +11,12 @@ class VueEditGenerator(BaseGenerator):
     def _get_form_type(self, field):
         form_type = field["Type"].lower()
         field_name = field["Field"].lower()
-        
-        # 处理特殊字段名称
+        comment = field["Comment"]
+
+    # 处理特殊字段名称
         if "enabled" in field_name or "disabled" in field_name or "is_" in field_name:
             return "switch"
-        if any(word in field_name for word in ["status", "type", "level"]):
+        if any(word in field_name for word in ["status", "type", "level", "gender"]):
             return "enum"
         if "area" in field_name or "region" in field_name:
             return "area-selector"
@@ -44,79 +46,11 @@ class VueEditGenerator(BaseGenerator):
             return "text"
             
         return "text"
-        
-    def _get_field_type(self, field):
-        """
-        获取字段的基础数据类型
-        Args:
-            field: 数据库字段信息字典
-        Returns:
-            str: 字段对应的基础类型
-        """
-        field_type = field["Type"].lower()
-        
-        # 数值类型映射
-        number_types = [
-            "int", "tinyint", "smallint", "mediumint", "bigint",  # 整数类型
-            "decimal", "float", "double", "numeric"  # 浮点数类型
-        ]
-        
-        # 文本类型映射
-        text_types = [
-            "text", "mediumtext", "longtext", "tinytext",  # 长文本类型
-            "varchar", "char"  # 短文本类型
-        ]
-        
-        # 日期时间类型映射
-        datetime_types = [
-            "datetime", "timestamp", "date", "time"
-        ]
-        
-        # 检查类型前缀
-        type_prefix = field_type.split('(')[0]  # 处理如 varchar(255) 的情况
-        
-        # 数值类型判断
-        if any(t in type_prefix for t in number_types):
-            if "decimal" in type_prefix or "float" in type_prefix or "double" in type_prefix:
-                return "number"
-            return "number"
-            
-        # 文本类型判断
-        if any(t in type_prefix for t in text_types):
-            if any(t in type_prefix for t in ["text", "mediumtext", "longtext", "tinytext"]):
-                return "longtext"
-            return "string"
-            
-        # 日期时间类型判断
-        if any(t in type_prefix for t in datetime_types):
-            if "date" == type_prefix:
-                return "date"
-            if "time" == type_prefix:
-                return "time"
-            return "datetime"
-            
-        # 其他类型
-        type_mapping = {
-            "json": "json",
-            "blob": "blob",
-            "binary": "binary",
-            "bool": "boolean",
-            "boolean": "boolean",
-            "enum": "enum",
-            "set": "set"
-        }
-        
-        for db_type, mapped_type in type_mapping.items():
-            if db_type in type_prefix:
-                return mapped_type
-                
-        # 默认返回文本类型
-        return "string"
 
     def _get_enum_fields(self, table_name):
         table_schema = self._get_table_schema(table_name)
         enum_fields = []
-        
+
         for field in table_schema:
             field_name = field["Field"].lower()
             form_type = self._get_form_type(field)
@@ -129,23 +63,81 @@ class VueEditGenerator(BaseGenerator):
                     "options_name": options_name,
                     "comment": field["Comment"]
                 })
-        
+
         return enum_fields
+
+    def _get_data_id_fields(self, table_name):
+        table_schema = self._get_table_schema(table_name)
+        data_id_fields = []
+
+        for field in table_schema:
+            field_name = field["Field"].lower()
+            field_type = self._get_field_type(field)
+            comment = field["Comment"]
+            if field_type == "number" and "[" in comment and "]" in comment:
+                try:
+                    bracket_content = comment[comment.index("[")+1:comment.index("]")].strip()
+                    if ":" in bracket_content:
+                        id_part, table_part = bracket_content.split(":")
+                        if id_part.strip() == "id":
+                            table_part = table_part.strip()
+                            data_id_fields.append({
+                                "field": field_name,
+                                "table_name": table_part,
+                                "options_name": f"{table_part}Options",
+                                "url": f"/api/{table_part}/list"  # API路径可以根据实际情况调整
+                            })
+                except:
+                    print("get data_id_fields failed")
+
+        return data_id_fields
 
     def _get_form_fields(self, table_name):
         table_schema = self._get_table_schema(table_name)
         form_fields = []
-        
+
         exclude_fields = ['id', 'site_id', 'create_time', 'update_time', 'delete_time']
-        
+
         for field in table_schema:
             if field["Field"] in exclude_fields:
                 continue
-                    
+
             field_name = field["Field"].lower()
             field_type = self._get_field_type(field)
             form_type = self._get_form_type(field)
-            
+
+            # 检查注释中是否包含关联字段信息
+            comment = field["Comment"]
+            if field_type == "number" and "[" in comment and "]" in comment:
+                try:
+                    # 提取方括号中的内容
+                    bracket_content = comment[comment.index("[")+1:comment.index("]")].strip()
+                    if ":" in bracket_content:
+                        # 解析 id:table 格式
+                        id_part, table_part = bracket_content.split(":")
+                        if id_part.strip() == "id":
+                            table_name = table_part.strip()
+                            # 修改表单类型为 data-id
+                            form_type = "data-id"
+                            label = self.clean_comment(comment[:comment.index("[")]).strip()
+                            # 修改字段配置
+                            field_config = {
+                                "field": field_name,
+                                "label": label,
+                                "required": "NO" in field["Null"],
+                                "form_type": form_type,
+                                "field_type": field_type,
+                                "props": {
+                                    "field": f"{table_name}Options",
+                                    "class": "w-[320px]",
+                                    "placeholder": f"请选择{label}"
+                                }
+                            }
+                            form_fields.append(field_config)
+                            continue
+                except:
+                    pass
+
             field_config = {
                 "field": field_name,
                 "label": self.clean_comment(field["Comment"]) or field_name,
@@ -154,13 +146,13 @@ class VueEditGenerator(BaseGenerator):
                 "form_type": form_type,
                 "field_type": field_type,
             }
-            
+
             # 配置属性
             props = {
                 "placeholder": f"请{'选择' if form_type in ['enum', 'select', 'area-selector'] else '输入'}{field_config['label']}",
                 "class": f"w-[{420 if form_type == 'textarea' else 320}px]"
             }
-            
+
             # 特殊字段处理
             if form_type == "area-selector":
                 props.update({
@@ -168,13 +160,13 @@ class VueEditGenerator(BaseGenerator):
                     "endLevel": 4,
                     "parentCode": "440000000000"
                 })
-                
+
             elif form_type == "enum":
                 props.update({
                     "field": f"{snake_to_camel(field_name)}Options",
                     "clearable": True
                 })
-                
+
             elif form_type == "switch":
                 props.update({
                     "activeValue": 1,
@@ -182,7 +174,7 @@ class VueEditGenerator(BaseGenerator):
                     "activeText": "启用",
                     "inactiveText": "禁用"
                 })
-                
+
             elif form_type == "number":
                 if "price" in field_name:
                     props.update({
@@ -195,31 +187,31 @@ class VueEditGenerator(BaseGenerator):
                         "min": 1,
                         "disabled": "!!formData.source_id" if field_name == "total_rooms" else None
                     })
-                
+
             elif form_type == "select-image":
                 props.update({
                     "type": "image",
                     "multiple": "imgs" in field_name or "images" in field_name,
                     "limit": 15 if "imgs" in field_name or "images" in field_name else 1
                 })
-                
+
             elif form_type == "select-file":
                 props.update({
                     "type": "image",
                     "multiple": "imgs" in field_name or "images" in field_name,
                     "limit": 15 if "imgs" in field_name or "images" in field_name else 1
                 })
-                
+
             elif form_type == "textarea":
                 props.update({
                     "rows": 4,
                     "maxlength": 500,
                     "showWordLimit": True
                 })
-                
+
             field_config["props"] = props
             form_fields.append(field_config)
-                
+
         return form_fields
 
     def get_template_variables(self):
@@ -229,7 +221,8 @@ class VueEditGenerator(BaseGenerator):
         table_schema = self._get_table_schema(table_name)
         form_fields = self._get_form_fields(table_name)
         enum_fields = self._get_enum_fields(table_name)
-        
+        data_id_fields = self._get_data_id_fields(table_name)
+
         has_area = any(f["form_type"] == "area-selector" for f in form_fields)
         has_image = any(f["form_type"] == "image" for f in form_fields) or any(f["form_type"] == "file" for f in form_fields)
         has_delete = "delete_time" in [f["Field"] for f in table_schema]
@@ -241,6 +234,7 @@ class VueEditGenerator(BaseGenerator):
             "table_comment": self._get_table_status(table_name, "Comment"),
             "form_fields": form_fields,
             "enum_fields": enum_fields,
+            "data_id_fields": data_id_fields,
             "has_area": has_area,
             "has_image": has_image,
             "has_delete": has_delete,

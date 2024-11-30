@@ -42,8 +42,15 @@ class EnumGenerator(BaseGenerator):
         """获取表中的枚举字段"""
         schema = self._get_table_schema(table_name)
         enum_fields = []
-        
+
+        excludes = [
+            "gender"
+        ]
+
         for field in schema:
+            if field["Field"] in excludes:
+                continue
+
             if field['Type'].startswith('tinyint') and not field['Field'].startswith('is_'):
                 enum_items = self._parse_enum_values(field['Comment'])  # 使用 enum_items
                 enum_field = {

@@ -64,30 +64,30 @@ const areaData = reactive({
 
 const formData = reactive({
 {%- for field in form_fields %}
-  {{ field.field }}: {% if field.form_type == 'enum' %}null{% elif field.field_type == 'number' %}0{% elif field.form_type == 'area-selector' %}{}{% elif field.form_type == 'select-file-multiple' or field.form_type == 'checkbox-group' %}[]{% else %}''{% endif %},
-{%- endfor %}
+    {{ field.field }}: {% if field.form_type in ['enum', 'data-id'] %}null{% elif field.field_type == 'number' %}0{% elif field.form_type == 'area-selector' %}{}{% elif field.form_type == 'select-file-multiple' or field.form_type == 'checkbox-group' %}[]{% else %}''{% endif %},{%- endfor %}
 })
 
 const formFields = [
   {% for field in form_fields -%}
-    { label: '{{ field.label }}',prop: '{{ field.field }}',type: '{{ field.form_type }}',
-      {%- if field.required -%}required: true,{%- endif -%}
-      {%- if field.disabled -%}disabled: {{ field.disabled }},{%- endif -%}
-      {%- if field.readonly -%}readonly: {{ field.readonly }},{%- endif -%}
+    { label: '{{ field.label }}', prop: '{{ field.field }}', type: '{{ field.form_type }}',
+      {%- if field.required -%}required: true, {%- endif -%}
+      {%- if field.disabled -%}disabled: {{ field.disabled }}, {%- endif -%}
+      {%- if field.readonly -%}readonly: {{ field.readonly }}, {%- endif -%}
       props: { {%- if field.form_type == 'number' -%}
-          {%- if field.precision is defined -%}precision: {{ field.precision }},{%- endif -%}
-          {%- if field.step is defined -%}step: {{ field.step }},{%- endif -%}
-          {%- if field.min is defined -%}min: {{ field.min }},{%- endif -%}
+          {%- if field.precision is defined -%}precision: {{ field.precision }}, {%- endif -%}
+          {%- if field.step is defined -%}step: {{ field.step }}, {%- endif -%}
+          {%- if field.min is defined -%}min: {{ field.min }}, {%- endif -%}
         {%- endif -%}
-        {%- if field.form_type == 'area-selector' -%}startLevel: 2, endLevel: 4, parentCode: '440000000000',{%- endif -%}
-        {%- if field.form_type == 'enum' -%}field: '{{ field.field|snake_to_camel }}Options', clearable: true,{%- endif -%}
-        {%- if field.form_type == 'textarea' -%}rows: {{ field.rows|default(4) }}, maxlength: 500, showWordLimit: true,{%- endif -%}
+        {%- if field.form_type == 'area-selector' -%}startLevel: 2, endLevel: 4, parentCode: '440000000000', {%- endif -%}
+        {%- if field.form_type == 'enum' -%}field: '{{ field.field|snake_to_camel }}Options', clearable: true, {%- endif -%}
+        {%- if field.form_type == 'data-id' -%}field: '{{ field.props.field }}', clearable: true, {%- endif -%}
+        {%- if field.form_type == 'textarea' -%}rows: {{ field.rows|default(4) }}, maxlength: 500, showWordLimit: true, {%- endif -%}
         {%- if field.form_type == 'select-image' -%}
-          type: '{{ field.props.type }}',{%- if field.props.multiple -%}multiple: true, limit: {{ field.props.limit|default(15) }},{%- endif -%}
+          type: '{{ field.props.type }}', {%- if field.props.multiple -%}multiple: true, limit: {{ field.props.limit|default(15) }}, {%- endif -%}
         {%- endif -%}
-        {%- if field.field_type == 'date' -%}type: 'date',{%- endif -%}
-        {%- if field.field_type == 'datetime' -%}type: 'datetime', valueFormat: 'YYYY-MM-DD HH:mm:ss', format: 'YYYY-MM-DD HH:mm:ss',{%- endif -%}
-        class: 'w-[{{ field.width|default(320) }}px]', placeholder: '请{{ '选择' if field.form_type in ['enum', 'select', 'area-selector', 'date-picker', 'time-picker'] else '输入' }}{{ field.label }}',} },
+        {%- if field.field_type == 'date' -%}type: 'date', {%- endif -%}
+        {%- if field.field_type == 'datetime' -%}type: 'datetime', valueFormat: 'YYYY-MM-DD HH:mm:ss', format: 'YYYY-MM-DD HH:mm:ss', {%- endif -%}
+        class: 'w-[{{ field.width|default(320) }}px]', placeholder: '请{{ '选择' if field.form_type in ['enum', 'select', 'area-selector', 'date-picker', 'time-picker', 'data-id'] else '输入' }}{{ field.label }}',} },
   {% endfor -%}
 ]
 
@@ -98,7 +98,7 @@ const rules: FormRules = {
         {%- if field.form_type == 'area-selector' -%}
           { required: true, validator: (rule, value, callback) => { if (!value) { callback(new Error('请选择城市')); return; } const { city_code, district_code, street_code } = value; if (!city_code) { callback(new Error('请选择城市')); return; } if (!district_code) { callback(new Error('请选择区县')); return; } if (!street_code) { callback(new Error('请选择街道')); return; } formData.city_code = city_code; formData.district_code = district_code; formData.street_code = street_code; callback(); }, trigger: ['change', 'blur'] }
         {%- else -%}
-          { required: true, message: '请{{ '选择' if field.form_type in ['enum', 'select', 'area-selector', 'select-file'] else '输入' }}{{ field.label }}', trigger: '{{ 'change' if field.form_type in ['select', 'enum', 'date-picker', 'area-selector', 'select-file'] else 'blur' }}' }
+          { required: true, message: '请{{ '选择' if field.form_type in ['enum', 'select', 'area-selector', 'select-file', 'data-id'] else '输入' }}{{ field.label }}', trigger: '{{ 'change' if field.form_type in ['select', 'enum', 'date-picker', 'area-selector', 'select-file', 'data-id'] else 'blur' }}' }
         {%- endif -%}
       ],
     {% endif -%}
@@ -137,9 +137,12 @@ onMounted(async () => {
 </script>
 
 <template>
-  <enum-provider url="/common/options" :fields="[
+    <enum-provider url="/common/options" :fields="[
     'approvalStatusOptions',
   {%- for field in enum_fields %}
+    '{{ field.options_name }}',
+  {%- endfor %}
+  {%- for field in data_id_fields %}
     '{{ field.options_name }}'{{ ', ' if not loop.last }}
   {%- endfor %}
   ]">

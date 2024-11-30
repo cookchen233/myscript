@@ -86,6 +86,75 @@ class BaseGenerator(object):
             rows.append(dict(zip(column_names, row)))
         return rows
 
+    def _get_field_type(self, field):
+        """
+        获取字段的基础数据类型
+        Args:
+            field: 数据库字段信息字典
+        Returns:
+            str: 字段对应的基础类型
+        """
+        field_type = field["Type"].lower()
+
+        # 数值类型映射
+        number_types = [
+            "int", "tinyint", "smallint", "mediumint", "bigint",  # 整数类型
+            "decimal", "float", "double", "numeric"  # 浮点数类型
+        ]
+
+        # 文本类型映射
+        text_types = [
+            "text", "mediumtext", "longtext", "tinytext",  # 长文本类型
+            "varchar", "char"  # 短文本类型
+        ]
+
+        # 日期时间类型映射
+        datetime_types = [
+            "datetime", "timestamp", "date", "time"
+        ]
+
+        # 检查类型前缀
+        type_prefix = field_type.split('(')[0]  # 处理如 varchar(255) 的情况
+
+        # 数值类型判断
+        if any(t in type_prefix for t in number_types):
+            if "decimal" in type_prefix or "float" in type_prefix or "double" in type_prefix:
+                return "number"
+            return "number"
+
+        # 文本类型判断
+        if any(t in type_prefix for t in text_types):
+            if any(t in type_prefix for t in ["text", "mediumtext", "longtext", "tinytext"]):
+                return "longtext"
+            return "string"
+
+        # 日期时间类型判断
+        if any(t in type_prefix for t in datetime_types):
+            if "date" == type_prefix:
+                return "date"
+            if "time" == type_prefix:
+                return "time"
+            return "datetime"
+
+        # 其他类型
+        type_mapping = {
+            "json": "json",
+            "blob": "blob",
+            "binary": "binary",
+            "bool": "boolean",
+            "boolean": "boolean",
+            "enum": "enum",
+            "set": "set"
+        }
+
+        for db_type, mapped_type in type_mapping.items():
+            if db_type in type_prefix:
+                return mapped_type
+
+        # 默认返回文本类型
+        return "string"
+
+
     def get_template_name(self):
         raise NotImplementedError("Subclasses must implement get_template_name()")
 

@@ -102,10 +102,14 @@ const handle{{ field.field|snake_to_camel(True) }}RangeChange = (val: [number, n
 </script>
 
 <template>
-  <enum-provider url="/common/options" :fields="[
+    <enum-provider url="/common/options" :fields="[
     'approvalStatusOptions',
-  {%- for field in enum_fields %}
-    '{{ field.options_name }}'{{ ', ' if not loop.last }}
+  {%- for field in table_fields %}
+  {%- if field.type == 'enum' %}
+    '{{ field.field|snake_to_camel }}Options',
+  {%- elif field.type == 'data-id' %}
+    '{{ field.field[:-3]|snake_to_camel }}Options',
+  {%- endif %}
   {%- endfor %}
   ]">
     <BaseList 
@@ -120,7 +124,7 @@ const handle{{ field.field|snake_to_camel(True) }}RangeChange = (val: [number, n
     :can-add-="false"
     :opts-="[
       {
-        txt: '审核',
+        txt: '审批记录',
         type: 'warning',
         event: handleXxDialogOpen,
       }
@@ -137,6 +141,8 @@ const handle{{ field.field|snake_to_camel(True) }}RangeChange = (val: [number, n
         <el-form-item label="{{ field.label }}" class="mt-[20px]">
           {%- if field.type == 'enum' %}
           <enum-selector v-model="query.{{ field.field }}" field="{{ field.field|snake_to_camel }}Options" class="w-[{{ field.width|default(200) }}px]" clearable :filterable="true" />
+          {%- elif field.type == 'data-id' %}
+          <enum-selector v-model="query.{{ field.field }}" field="{{ field.field[:-3]|snake_to_camel }}Options" class="w-[{{ field.width|default(200) }}px]" clearable :filterable="true" />
           {%- elif field.type == 'daterange' %}
           <el-date-picker v-model="query.{{ field.field }}_range" type="daterange" range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期" value-format="YYYY-MM-DD" class="w-[360px]" clearable />
           {%- elif field.type == 'numberrange' %}
@@ -152,13 +158,13 @@ const handle{{ field.field|snake_to_camel(True) }}RangeChange = (val: [number, n
       </template>
 
       {%- for field in table_fields %}
-      <el-table-column prop="{{ field.field }}" label="{{ field.label }}" {% if field.width %} width="{{ field.width }}"{% endif %}{% if field.align %} align="{{ field.align }}"{% endif %}{% if field.type == 'text' %} show-overflow-tooltip{% endif %} {{ field.type }}>
-        {%- if field.type %}
+      <el-table-column prop="{{ field.field }}" label="{{ field.label }}" {% if field.width %} width="{{ field.width }}"{% endif %}{% if field.align %} align="{{ field.align }}"{% endif %}{% if field.type == 'text' %} show-overflow-tooltip{% endif %}>
+        {%- if field.template %}
         <template #default="{row}">
           {%- if field.type == 'enum' %}
           <enum-label field="{{ field.field|snake_to_camel }}Options" :value="row.{{ field.field }}"/>
-          {%- elif field.type == 'datetime' %}
-          {{ '{{ row.' + field.field + ' }}' }}
+          {%- elif field.type == 'data-id' %}
+          <enum-label field="{{ field.field[:-3]|snake_to_camel }}Options" :value="row.{{ field.field }}"/>
           {%- elif field.type == 'money' %}
           <span class="text-orange-500">¥{{ '{{ row.' + field.field + ' }}' }}</span>
           {%- elif field.type == 'image' %}
