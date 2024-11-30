@@ -86,7 +86,7 @@ get_token() {
 # 获取token
 TOKEN=$(get_token)
 if [ $? -ne 0 ]; then
-    TOKEN="7QzoxKHbXKtcav6H3zsM0unbFQzQnnkhgG65rYqonro="
+    TOKEN="fOhLRlxQmuJ/+6/3kjMj4v0Bf+3uvhIYRIOMCI3oUWM="
 fi
 
 # 发送请求并保存响应

@@ -1,6 +1,6 @@
 <!-- views/{{ module_name }}/{{ table_name|replace('_', '-') }}/edit.vue -->
 <script lang="ts" setup>
-import { ref, reactive, onMounted, computed } from 'vue'
+import {ref, reactive, onMounted, computed, PropType} from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { FormRules } from 'element-plus'
@@ -9,11 +9,29 @@ import type { ApiResponse, OptionItem } from '@/types/common'
 import EnumProvider from "@/components/enum/enum-provider.vue"
 import BaseEdit from "@/components/base-edit.vue"
 
-const props = defineProps<{
-  visible?: boolean
-  id?: number | null
-  mode?: 'dialog' | 'page'
-}>()
+const props = defineProps({
+  visible: {
+    type: Boolean,
+    required: false,
+  },
+  id: {
+    type: Number,
+    required: false,
+    default: null,
+  },
+  mode: {
+    type: String as PropType<'dialog' | 'page'>,
+    default: 'page',
+  },
+  query: {
+    type: Object,
+    required: false,
+  },
+  onSuccess: {
+    type: Function as PropType<(row: Object) => void>,
+    required: false,
+  },
+});
 
 const emit = defineEmits(['update:visible', 'success', 'cancel'])
 
@@ -25,7 +43,6 @@ const API = {
   read: '/{{ module_name }}.{{ class_name }}/read',
   update: '/{{ module_name }}.{{ class_name }}/update',
   create: '/{{ module_name }}.{{ class_name }}/create',
-  options: '/{{ module_name }}.Common/options'
 }
 
 const isEdit = computed(() => {
@@ -53,7 +70,7 @@ const formData = reactive({
 
 const formFields = [
 {%- for field in form_fields %}
-  { label: '{{ field.label }}', prop: '{{ field.field }}', type: '{{ field.form_type }}', {% if field.required %}required: true, {% endif %}{% if field.disabled %}disabled: {{ field.disabled }}, {% endif %}{% if field.readonly %}readonly: {{ field.readonly }}, {% endif %}props: { {% if field.form_type == 'number' %}{% if field.precision is defined %}precision: {{ field.precision }}, {% endif %}{% if field.step is defined %}step: {{ field.step }}, {% endif %}{% if field.min is defined %}min: {{ field.min }}, {% endif %}{% endif %}{% if field.form_type == 'area-selector' %}startLevel: 2, endLevel: 4, parentCode: '440000000000', {% endif %}{% if field.form_type == 'enum' %}field: '{{ field.field|snake_to_camel }}Options', clearable: true, {% endif %}{% if field.form_type == 'textarea' %}rows: {{ field.rows|default(4) }}, maxlength: 500, showWordLimit: true, {% endif %}{% if field.form_type == 'select-file' %}fileType: '{{ field.file_type }}', {% if field.multiple %}multiple: true, limit: {{ field.limit|default(15) }}, {% endif %}{% endif %}placeholder: '请{{ '选择' if field.form_type in ['enum', 'select', 'area-selector'] else '输入' }}{{ field.label }}', class: 'w-[{{ field.width|default(320) }}px]' } },
+  { label: '{{ field.label }}', prop: '{{ field.field }}', type: '{{ field.form_type }}', {% if field.required %}required: true, {% endif %}{% if field.disabled %}disabled: {{ field.disabled }}, {% endif %}{% if field.readonly %}readonly: {{ field.readonly }}, {% endif %}props: { {% if field.form_type == 'number' %}{% if field.precision is defined %}precision: {{ field.precision }}, {% endif %}{% if field.step is defined %}step: {{ field.step }}, {% endif %}{% if field.min is defined %}min: {{ field.min }}, {% endif %}{% endif %}{% if field.form_type == 'area-selector' %}startLevel: 2, endLevel: 4, parentCode: '440000000000', {% endif %}{% if field.form_type == 'enum' %}field: '{{ field.field|snake_to_camel }}Options', clearable: true, {% endif %}{% if field.form_type == 'textarea' %}rows: {{ field.rows|default(4) }}, maxlength: 500, showWordLimit: true, {% endif %}{% if field.form_type == 'select-file' %}fileType: '{{ field.file_type }}', {% if field.multiple %}multiple: true, limit: {{ field.limit|default(15) }}, {% endif %}{% endif %}{% if field.form_type == 'date-picker' %}type: 'date', {% endif %}{% if field.form_type == 'time-picker' %}type: 'datetime', valueFormat: 'YYYY-MM-DD HH:mm:ss', format: 'YYYY-MM-DD HH:mm:ss', {% endif %}placeholder: '请{{ '选择' if field.form_type in ['enum', 'select', 'area-selector', 'date-picker', 'time-picker'] else '输入' }}{{ field.label }}', class: 'w-[{{ field.width|default(320) }}px]' } },
 {%- endfor %}
 ]
 
@@ -86,6 +103,10 @@ const handleSubmit = async () => {
     return await $lc.submit<ApiResponse<null>>(url, data)
 }
 
+const onSuccess = (data:Object) =>{
+  props.onSuccess?.(data)
+}
+
 onMounted(async () => {
   if (currentId.value) {
     await loadData()
@@ -94,10 +115,12 @@ onMounted(async () => {
 </script>
 
 <template>
-  <enum-provider 
-    url="/{{ module_name }}.Common/options" 
-    :fields="[{% for field in enum_fields %}'{{ field.options_name }}'{{ ', ' if not loop.last }}{% endfor %}]"
-  >
+  <enum-provider url="/common/options" :fields="[
+    'approvalStatusOptions',
+  {%- for field in enum_fields %}
+    '{{ field.options_name }}'{{ ', ' if not loop.last }}
+  {%- endfor %}
+  ]">
     <base-edit
       v-model="formData"
       :fields="formFields"
@@ -108,7 +131,8 @@ onMounted(async () => {
       @update:visible="(val) => emit('update:visible', val)"
       :id="currentId"
       :api="API"
-      @success="() => emit('success')"
+      @success="(romData) => emit('success')"
+      :onSuccess="onSuccess"
     />
   </enum-provider>
 </template>

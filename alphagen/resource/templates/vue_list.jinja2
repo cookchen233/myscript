@@ -5,18 +5,23 @@ import { Search } from '@element-plus/icons-vue'
 import BaseList from '@/components/base-list.vue'
 import EnumSelector from "@/components/enum/enum-selector.vue"
 import EnumLabel from "@/components/enum/enum-label.vue"
+import EnumDropdown from "@/components/enum/enum-dropdown.vue";
 import EnumStatusLabel from "@/components/enum/enum-status-label.vue"
 import {{ class_name }}Edit from './edit.vue'
 import EnumProvider from "@/components/enum/enum-provider.vue"
 import {useGlobalProperties} from "@/composables/useGlobalProperties";
 import {useRoute} from "vue-router";
-//import XxList from '../xx/list.vue'
+//import XxList from '../enroll/list.vue'
 
 
 const props = defineProps({
-  belongToId: {
-    type: Number,
-    required: true
+  query: {
+    type: Object,
+    required: false,
+  },
+  onEditSuccess: {
+    type: Function as PropType<(row:Object) => void>,
+    required: false
   },
   mode: {
     type: String as PropType<'dialog' | 'page'>,
@@ -43,7 +48,6 @@ const showRestore = computed(() => query.is_trashed)
 // 查询条件
 const query = reactive({
   keywords: '',
-  belongToId: props.belongToId || route.query.belongToId, // 用于父组件调用,这里要改请求参数名
   {%- for field in search_fields %}
   {%- if field.type == 'daterange' or field.type == 'numberrange' %}
   {{ field.field }}_range: [],
@@ -54,12 +58,21 @@ const query = reactive({
   {%- if has_delete %}
   is_trashed: false,
   {%- endif %}
+  ...props.query
 })
 
 const resetQuery = (newVal) => {
   Object.assign(query, {
     ...newVal
   })
+}
+
+// 弹窗控制
+const xxDialogVisible = ref(false)
+const xxQuery = ref<Object | null>(null)
+const handleXxDialogOpen = (row: any) => {
+  xxDialogVisible.value = true
+  xxQuery.value = {member_id:row.member_id}
 }
 
 const handleUpdate = async (row: any, updateData: any) => {
@@ -69,6 +82,12 @@ const handleUpdate = async (row: any, updateData: any) => {
     ...updateData
   }
   await $lc.submit(url, data)
+  onEditSuccess?.(data)
+}
+const onEditSuccess = (data:Object)=>{
+  baseListRef.value.reload()
+  props.onEditSuccess?.(data)
+  xxDialogVisible.value = false
 }
 
 {%- for field in search_fields %}
@@ -83,16 +102,30 @@ const handle{{ field.field|snake_to_camel(True) }}RangeChange = (val: [number, n
 </script>
 
 <template>
-  <enum-provider url="/{{ module_name }}.Common/options" :fields="[{% for field in enum_fields %}
-  '{{ field.options_name }}'{{ ', ' if not loop.last }}
-  {% endfor %}]">
+  <enum-provider url="/common/options" :fields="[
+    'approvalStatusOptions',
+  {%- for field in enum_fields %}
+    '{{ field.options_name }}'{{ ', ' if not loop.last }}
+  {%- endfor %}
+  ]">
     <BaseList 
     :api="API" 
-    :edit-component="{{ class_name }}Edit" 
+    :edit-component="{{ class_name }}Edit"
+    :on-edit-success="onEditSuccess"
     :query="query"
     :reset-query="resetQuery"
     ref="baseListRef" 
     title="{{ table_comment }}"
+    :can-delete-="false"
+    :can-add-="false"
+    :opts-="[
+      {
+        txt: '审核',
+        type: 'warning',
+        event: handleXxDialogOpen,
+      }
+    ]"
+    :show-search="!props.query"
     >
       <template #search-items>
         <el-form-item label="搜索" class="mt-[20px]">
@@ -147,7 +180,7 @@ const handle{{ field.field|snake_to_camel(True) }}RangeChange = (val: [number, n
       {%- endif %}
     </BaseList>
   </enum-provider>
-<!--  <el-dialog v-model="dialogVisible" title="列表" width="80%" destroy-on-close >-->
-<!--    <Xx :belong-to-id="currentId"/>-->
-<!--  </el-dialog>-->
+  <!-- <el-dialog v-model="xxDialogVisible" title="列表" width="80%" destroy-on-close > -->
+     <!-- <XxList :query="xxQuery" :on-edit-success="onEditSuccess" /> -->
+  <!-- </el-dialog> -->
 </template>

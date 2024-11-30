@@ -21,7 +21,7 @@ class VueListGenerator(BaseGenerator):
             # return "datetime"
         if any(word in field_name for word in ["status", "type", "level"]):
             return "enum"
-        if "preview_img" in field_name or "imgs" in field_name or "images" in field_name:
+        if "img" in field_name or "imgs" in field_name or "images" in field_name:
             return "image"
         # switch类型只处理 tinyint 且是启用/禁用相关字段
         if ("enabled" in field_name or "disabled" in field_name or field_name.startswith("is_")) and "tinyint" in field_type:

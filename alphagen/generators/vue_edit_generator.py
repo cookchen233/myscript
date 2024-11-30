@@ -17,14 +17,16 @@ class VueEditGenerator(BaseGenerator):
             return "enum"
         if "area" in field_name or "region" in field_name:
             return "area-selector"
-        if "preview_img" in field_name:
-            return "select-file"
+        if "img" in field_name:
+            return "image"
         if "imgs" in field_name or "images" in field_name:
-            return "select-file"
+            return "image"
         if "file" in field_name:
-            return "select-file"
-        if "time" in field_name or "date" in field_name:
+            return "file"
+        if "date" in field_name or "date" in form_type:
             return "date-picker"
+        if "time" in field_name or "time" in form_type:
+            return "datetime-picker"
         if "content" in field_name or "desc" in field_name or "remark" in field_name:
             return "textarea"
                 
@@ -193,7 +195,14 @@ class VueEditGenerator(BaseGenerator):
                         "disabled": "!!formData.source_id" if field_name == "total_rooms" else None
                     })
                 
-            elif form_type == "select-file":
+            elif form_type == "image":
+                props.update({
+                    "fileType": "image",
+                    "multiple": "imgs" in field_name or "images" in field_name,
+                    "limit": 15 if "imgs" in field_name or "images" in field_name else 1
+                })
+                
+            elif form_type == "file":
                 props.update({
                     "fileType": "image",
                     "multiple": "imgs" in field_name or "images" in field_name,
@@ -221,7 +230,7 @@ class VueEditGenerator(BaseGenerator):
         enum_fields = self._get_enum_fields(table_name)
         
         has_area = any(f["form_type"] == "area-selector" for f in form_fields)
-        has_image = any(f["form_type"] == "select-file" for f in form_fields)
+        has_image = any(f["form_type"] == "image" for f in form_fields) or any(f["form_type"] == "file" for f in form_fields)
         has_delete = "delete_time" in [f["Field"] for f in table_schema]
         
         return {

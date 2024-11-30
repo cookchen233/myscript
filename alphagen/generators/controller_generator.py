@@ -47,23 +47,6 @@ class ControllerGenerator(BaseGenerator):
             model_properties.append(model_property)
         return model_properties
 
-    def generate(self):
-        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        rendered = self.render()
-        filename = os.path.join(self.rendered_file_dir, self.file_name + ".php")
-
-        # 确保目录存在
-        os.makedirs(os.path.dirname(filename), exist_ok=True)
-    
-        if not self.force and os.path.exists(filename):
-            print(f'File already exists, skipping: {filename}')
-            return
-        else:
-            # 如果是新文件，直接生成
-            with open(filename, "w", encoding='utf-8') as f:
-                f.write(rendered)
-                print(f'Successfully generated new file: {filename}')
-
     def set_module_name(self, module_name):
         self.module_name = module_name
 
