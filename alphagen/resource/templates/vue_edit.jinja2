@@ -33,7 +33,9 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['update:visible', 'success', 'cancel'])
+defineOptions({
+    inheritAttrs: false
+})
 
 const router = useRouter()
 const route = useRoute()
@@ -125,7 +127,7 @@ const handleSubmit = async () => {
     return await $lc.submit<ApiResponse<null>>(url, data)
 }
 
-const onSuccess = (data:Object) =>{
+const handleSuccess = (data:Object) =>{
   props.onSuccess?.(data)
 }
 
@@ -153,11 +155,12 @@ onMounted(async () => {
       :title="isEdit ? '编辑{{ table_comment }}' : '添加{{ table_comment }}'"
       :mode="props.mode"
       :visible="props.visible"
-      @update:visible="(val) => emit('update:visible', val)"
+      @update:visible="$emit('update:visible', $event)"
+      @cancel="$emit('cancel')"
+      @success="$emit('success', $event)"
       :id="currentId"
       :api="API"
-      @success="(romData) => emit('success')"
-      :onSuccess="onSuccess"
+      :on-success="handleSuccess"
     />
   </enum-provider>
 </template>

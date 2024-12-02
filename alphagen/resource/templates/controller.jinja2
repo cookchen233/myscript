@@ -14,8 +14,46 @@ class {{class_name}} extends CrudController
 {
     protected function initialize()
     {
-        parent::initialize();
         $this->model = new {{class_name}}Model();
+        parent::initialize();
+    }
+
+    protected function processReadResult(&$data): void
+    {
+        //$data->product_ids = $data->products ? array_column($data->products->toArray(), 'id') : [];
+    }
+
+    protected function afterUpdate($data)
+    {
+        // 处理关联数据
+        if (isset($data['product_ids'])) {
+            // 删除原有关联
+            TradeProductToProductRiskModel::where('product_risk_id', $data["id"])->delete();
+            $this->afterCreate($data);
+        }
+    }
+
+    protected function afterCreate($data)
+    {
+        // 处理关联数据
+        if (isset($data["product_ids"])) {
+            $insertData = array_map(function ($productId) use ($data) {
+                return [
+                    'product_risk_id' => $data["id"],
+                    'product_id' => $productId,
+                    'create_time' => date('Y-m-d H:i:s'),
+                    'update_time' => date('Y-m-d H:i:s'),
+                    'site_id' => $this->site_id
+                ];
+            }, $data['product_ids']);
+            (new TradeProductToProductRiskModel())->insertAll($insertData);
+        }
+    }
+
+    public function afterDelete($oldData)
+    {
+        // 删除数据关联
+        //TradeProductToProductRiskModel::where('product_risk_id', $oldData['id'])->delete();
     }
 
 }
