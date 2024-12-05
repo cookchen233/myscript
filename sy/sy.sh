@@ -404,6 +404,10 @@ if [ "$is_all" == true ]; then
         if [[ -f .gitignore ]]; then
             while IFS= read -r line; do
                 [[ -z "$line" || "$line" =~ ^# || "$line" =~ ^\.git ]] && continue
+                # 不排除配置文件中指定的路径
+                if [ "$line" == "${PUSH_PATH#/}" ] || [ "$line" == "${PUSH_PATH}" ]; then
+                    continue
+                fi
                 exclude_items+=("$line")
             done < .gitignore
         else
