@@ -1,4 +1,4 @@
-<!-- views/{{ module_name }}/{{ table_name|replace('_', '-') }}/edit.vue -->
+<!-- src/pages/{{ module_name }}/{{ table_name|replace('_', '-')|replace('lc-'+module_name+'-', '') }}/edit.vue -->
 <script lang="ts" setup>
 import {ref, reactive, onMounted, computed, PropType} from 'vue'
 import { useRouter, useRoute } from 'vue-router'
@@ -34,7 +34,7 @@ const props = defineProps({
 });
 
 defineOptions({
-    inheritAttrs: false
+  inheritAttrs: false
 })
 
 const router = useRouter()
@@ -66,7 +66,15 @@ const areaData = reactive({
 
 const formData = reactive({
 {%- for field in form_fields %}
-    {{ field.field }}: {% if field.form_type in ['enum', 'data-id'] %}null{% elif field.field_type == 'number' %}0{% elif field.form_type == 'area-selector' %}{}{% elif field.form_type == 'select-file-multiple' or field.form_type == 'checkbox-group' %}[]{% else %}''{% endif %},{%- endfor %}
+    {{ field.field }}: {% if field.form_type in ['enum', 'data-id'] %}null
+    {%- elif field.form_type == 'area-selector' %}{}
+    {%- elif field.form_type == 'select-file-multiple' or field.form_type == 'checkbox-group' %}[]
+    {%- elif field.form_type == 'switch' %}1
+    {%- elif field.field_type == 'number' %}0
+    {%- elif field.field_type == 'string' %}''
+    {%- else %}null
+    {%- endif %},
+{%- endfor %}
 })
 
 const formFields = [
@@ -109,15 +117,9 @@ const rules: FormRules = {
 
 const loadData = async () => {
   if (!currentId.value) return
-
-  try {
-    const res = await $lc.get<ApiResponse<any>>(API.read, { id: currentId.value })
-    if (res.code === 1 && res.data) {
-      Object.assign(formData, res.data)
-    }
-  } catch (error) {
-    console.error('获取详情失败:', error)
-    ElMessage.error('获取详情失败')
+  const res = await $lc.get<ApiResponse<any>>(API.read, { id: currentId.value })
+  if (res.code === 1 && res.data) {
+    Object.assign(formData, res.data)
   }
 }
 

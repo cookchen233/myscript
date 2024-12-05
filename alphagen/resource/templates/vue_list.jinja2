@@ -1,4 +1,4 @@
-<!-- views/{{ module_name }}/{{ table_name|replace('_', '-') }}/list.vue -->
+<!-- src/pages/{{ module_name }}/{{ table_name|replace('_', '-')|replace('lc-'+module_name+'-', '') }}/list.vue -->
 <script lang="ts" setup>
 import { computed, PropType, reactive, ref } from 'vue'
 import { Search } from '@element-plus/icons-vue'
