@@ -24,10 +24,10 @@ mkdir -p "$CACHE_DIR"
 cleanup() {
     # 删除临时文件
     rm -f "$SYNC_STATUS_FILE" "$GIT_STATUS_FILE" "$GIT_ERROR_FILE" "$RSYNC_ERROR_FILE"
-    
+
     # 清理过期的缓存文件(比如7天前的)
     find "$CACHE_DIR" -type f -mtime +7 -delete 2>/dev/null
-    
+
     # 清理SSH连接
     if [[ -n "$REMOTE_USER" && -n "$REMOTE_IP" && -n "$PORT" ]]; then
         ssh -O stop -o ControlPath="$SSH_CONTROL_PATH" -p "$PORT" "$REMOTE_USER@$REMOTE_IP" 2>/dev/null
@@ -46,10 +46,10 @@ setup_ssh_controlmaster() {
     local remote_user=$1
     local remote_ip=$2
     local port=$3
-    
+
     export SSH_CONTROL_PATH="$HOME/.ssh/cm-%r@%h:%p"
     mkdir -p "$(dirname "$SSH_CONTROL_PATH")"
-    
+
     if ! ssh -O check -o ControlPath="$SSH_CONTROL_PATH" "$remote_user@$remote_ip" 2>/dev/null; then
         ssh -nNf -o ControlMaster=yes \
                -o ControlPath="$SSH_CONTROL_PATH" \
@@ -76,21 +76,21 @@ timer_end() {
     local safe_name=$(echo "$timer_name" | md5 2>/dev/null || echo "$timer_name" | md5sum | cut -d' ' -f1)
     local start_var="timer_${safe_name}"
     local start_time=${!start_var}
-    
+
     if [[ -z "$start_time" ]]; then
         echo "错误: 计时器 '${timer_name}' 未启动" >&2
         return 1
     fi
-    
+
     if [[ "$(uname)" == "Darwin" ]]; then
         end_time=$(perl -MTime::HiRes=time -e 'printf "%.3f\n", time')
     else
         end_time=$(date +%s.%N)
     fi
-    
+
     execution_time=$(printf "%.2f" $(echo "$end_time - $start_time" | bc))
     echo "${timer_name}耗时: ${execution_time}s"
-    
+
     unset "$start_var"
 }
 
@@ -98,11 +98,11 @@ timer_end() {
 read_config() {
     local json_file_name=$1
     local cache_file="$CACHE_DIR/${json_file_name}.cache"
-    
+
     if [[ ! -f "$json_file_name" ]]; then
     echo -e "\033[1;31m找不到配置文件 $json_file_name\033[0m"
     echo -e "\033[1;31m请创建配置文件，格式示例：\033[0m"
-    
+
     # 先显示配置文件格式
     cat << 'EOF'
 {
@@ -114,7 +114,7 @@ read_config() {
     "root": "/www/wwwroot/"
 }
 EOF
-        
+
         # 再显示配置说明
         echo -e "配置说明:"
         echo -e "path      - 本地项目相对路径(通常为/)"
@@ -125,7 +125,7 @@ EOF
         echo -e "root      - 远程根目录"
         return 1
     fi
-    
+
     if [[ ! -f "$cache_file" ]] || [[ "$json_file_name" -nt "$cache_file" ]]; then
         if ! jq -r '.path,.to_path,.ip,.user,.port,.root' "$json_file_name" > "$cache_file.tmp" 2>/dev/null; then
             echo -e "\033[1;31m配置文件格式错误: $json_file_name\033[1;0m"
@@ -133,7 +133,7 @@ EOF
         fi
         mv "$cache_file.tmp" "$cache_file"
     fi
-    
+
     {
         read -r PUSH_PATH
         read -r TO_PATH
@@ -142,7 +142,7 @@ EOF
         read -r _PORT
         read -r _ROOT
     } < "$cache_file"
-    
+
     return 0
 }
 
@@ -150,9 +150,9 @@ do_rsync() {
     local target=$1
     local is_all=$2
     local branch_for_diff=$3
-    
+
     timer_start "rsync同步"
-    
+
     #执行yzl脚本#########################################################
     HOME_WORK_PATH=$(pwd)
     SERVER_HOME_WORK_PATH="/www/wwwroot/" #服务器基础目录
@@ -180,14 +180,14 @@ do_rsync() {
     # 设置SSH控制主连接
     # 创建控制socket目录
     mkdir -p ~/.ssh/controlmasters
-    
+
     # 清理可能存在的旧连接
     ssh -O stop -o ControlPath="~/.ssh/controlmasters/%r@%h:%p" \
         -p "$PORT" "$REMOTE_USER@$REMOTE_IP" 2>/dev/null || true
-    
+
     # 删除可能存在的旧 socket 文件
     rm -f ~/.ssh/controlmasters/"$REMOTE_USER@$REMOTE_IP:$PORT" 2>/dev/null || true
-    
+
     # 设置SSH控制主连接
     ssh -nNf -o ControlMaster=yes \
            -o ControlPath="~/.ssh/controlmasters/%r@%h:%p" \
@@ -352,13 +352,13 @@ switch_back() {
     local original_branch=$1
     local target_branch=$2
     local has_remote=$3
-    
+
     echo -e "\033[1;34m切回到 ${original_branch}\033[1;0m"
     if ! git checkout "$original_branch"; then
         echo -e "\033[1;31m切换分支失败\033[1;0m"
         return 1
     fi
-    
+
     if $has_remote; then
         echo -e "\033[1;34m删除本地分支 ${target_branch}\033[1;0m"
         git branch -D "$target_branch" &
