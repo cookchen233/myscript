@@ -53,7 +53,7 @@ class VueListGenerator(BaseGenerator):
                     "template": True
                 },
                 "switch": {
-                    "width": 100, 
+                    "width": 100,
                     "template": True
                 },
                 "data-id": {
@@ -109,25 +109,32 @@ class VueListGenerator(BaseGenerator):
             if field_name in exclude_fields:
                 continue
 
-            if base_type == "longtext" or base_type == "number":
+            if base_type == "longtext":
                 continue
+
+            # 设置搜索类型
+            search_type = "text"
 
             if display_type == "datetime":
                 search_type = "daterange"
-            
+
+            elif "_id" in field_name and "[id:" in comment:
+                search_type = "data-id"
+
             if "_id" not in field_name:
                 continue
 
             field_config = {
                 "field": field_name,
-                "label": self.clean_comment(field["Comment"]) or field_name,
+                "label": self.clean_comment(comment) or field_name,
                 "type": search_type
             }
 
             # 根据不同的搜索类型设置配置
             search_type_config = {
                 "enum": {
-                    "width": 200
+                    "width": 200,
+                    "clearable": True
                 },
                 "numberrange": {
                     "min": 0,
@@ -138,7 +145,7 @@ class VueListGenerator(BaseGenerator):
                     "width": 120
                 }
             }
-            
+
             # 如果存在对应的配置则更新
             if search_type in search_type_config:
                 field_config.update(search_type_config[search_type])
@@ -158,6 +165,9 @@ class VueListGenerator(BaseGenerator):
 
         has_delete = "delete_time" in [f["Field"] for f in table_schema]
 
+        # 获取批量操作按钮配置
+        batch_buttons = self._get_batch_buttons(table_schema)
+
         return {
             "module_name": self.module_name,
             "class_name": base_name,
@@ -167,8 +177,30 @@ class VueListGenerator(BaseGenerator):
             "search_fields": search_fields,
             "enum_fields": enum_fields,
             "has_delete": has_delete,
+            "batch_buttons": batch_buttons,
             "datetime": datetime
         }
+
+    def _get_batch_buttons(self, table_schema):
+        """获取批量操作按钮配置"""
+        buttons = []
+
+        # 检查是否有 is_enabled 字段
+        if any(f["Field"] == "is_enabled" for f in table_schema):
+            buttons.append({
+                "text": "批量启用",
+                "type": "primary",
+                "update_data": {"is_enabled": 1},
+                "confirm_message": "确定要批量启用选中的记录吗？"
+            })
+            buttons.append({
+                "text": "批量禁用",
+                "type": "warning",
+                "update_data": {"is_enabled": 0},
+                "confirm_message": "确定要批量禁用选中的记录吗？"
+            })
+
+        return buttons
 
     def generate(self):
         rendered = self.render()

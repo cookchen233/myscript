@@ -12,6 +12,7 @@ import {{ class_name }}Edit from './edit.vue'
 import EnumProvider from "@/components/enum/enum-provider.vue"
 import {useGlobalProperties} from "@/composables/useGlobalProperties";
 import {useRoute} from "vue-router";
+import {ElMessage, ElMessageBox} from "element-plus";
 //import XxList from '../enroll/list.vue'
 
 
@@ -41,6 +42,7 @@ const API = {
   restore: '/{{ module_name }}.{{ class_name }}/restore',
   restoreBatch: '/{{ module_name }}.{{ class_name }}/restoreBatch',
   {%- endif %}
+  updateBatch: '/{{ module_name }}.{{ class_name }}/updateBatch',
 }
 
 const baseListRef = ref<InstanceType<typeof BaseList> | null>(null)
@@ -91,15 +93,32 @@ const onEditSuccess = (data:Object)=>{
   xxDialogVisible.value = false
 }
 
-{%- for field in search_fields %}
-{%- if field.type == 'daterange' %}
-const {{ field.field|snake_to_camel }}Range = ref<[string, string] | null>(null)
-const handle{{ field.field|snake_to_camel(True) }}RangeChange = (val: [string, string] | null) => { query.{{ field.field }}_range = val ? val : [] }
-{%- elif field.type == 'numberrange' %}
-const {{ field.field|snake_to_camel }}Range = ref<[number, number] | null>(null)
-const handle{{ field.field|snake_to_camel(True) }}RangeChange = (val: [number, number] | null) => { query.{{ field.field }}_range = val ? val : [] }
-{%- endif %}
-{%- endfor %}
+// 批量更新
+const handleBatchUpdate = async (updateData: any, message = '确定要批量更新吗？') => {
+  const selection = baseListRef.value?.getSelectedRows()
+  if (!selection?.length) {
+    ElMessage.warning('请选择要更新的记录')
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(message)
+    const dataSet = selection.map(item => ({
+      id: item.id,
+      ...updateData
+    }))
+    const res = await $lc.post(API.updateBatch, dataSet)
+    if (res.code === 1) {
+      ElMessage.success('批量更新成功')
+      baseListRef.value?.reload()
+    }
+  } catch (e) {
+    if (e !== 'cancel') {
+      console.error(e)
+    }
+  }
+}
+
 </script>
 
 <template>
@@ -123,6 +142,7 @@ const handle{{ field.field|snake_to_camel(True) }}RangeChange = (val: [number, n
     title="{{ table_comment }}"
     :can-delete-="false"
     :can-add-="false"
+    :selectable-="true"
     :opts-="[
       {
         txt: '审批记录',
@@ -158,6 +178,11 @@ const handle{{ field.field|snake_to_camel(True) }}RangeChange = (val: [number, n
         {%- endfor %}
       </template>
 
+      <template #extra-buttons>
+        {%- for button in batch_buttons %}
+        <el-button type="{{ button.type }}" @click='handleBatchUpdate({{ button.update_data | tojson }}, "{{ button.confirm_message }}")'>{{ button.text }}</el-button>
+        {%- endfor %}
+      </template>
       {%- for field in table_fields %}
       <el-table-column prop="{{ field.field }}" label="{{ field.label }}" {% if field.width %} width="{{ field.width }}"{% endif %}{% if field.align %} align="{{ field.align }}"{% endif %}{% if field.type == 'text' %} show-overflow-tooltip{% endif %}>
         {%- if field.template %}
@@ -193,3 +218,4 @@ const handle{{ field.field|snake_to_camel(True) }}RangeChange = (val: [number, n
      <!-- <XxList :query="xxQuery" :on-edit-success="onEditSuccess" /> -->
   <!-- </el-dialog> -->
 </template>
+
