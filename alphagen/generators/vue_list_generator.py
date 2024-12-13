@@ -39,7 +39,8 @@ class VueListGenerator(BaseGenerator):
                 "field": field_name,
                 "label": self.clean_comment(field["Comment"]) or field_name,
                 "prop": snake_to_camel(field_name),
-                "type": display_type,
+                "display_type": display_type,
+                "base_type": base_type,
                 "template": False,
             }
 
@@ -75,8 +76,6 @@ class VueListGenerator(BaseGenerator):
             if display_type in type_configs:
                 field_config.update(type_configs[display_type])
             table_fields.append(field_config)
-
-        print(table_fields)
 
         return table_fields
 
@@ -127,7 +126,7 @@ class VueListGenerator(BaseGenerator):
             field_config = {
                 "field": field_name,
                 "label": self.clean_comment(comment) or field_name,
-                "type": search_type
+                "search_type": search_type
             }
 
             # 根据不同的搜索类型设置配置
@@ -161,7 +160,6 @@ class VueListGenerator(BaseGenerator):
         table_schema = self._get_table_schema(table_name)
         table_fields = self._get_table_fields(table_name)
         search_fields = self._get_search_fields(table_name)
-        enum_fields = self._get_enum_fields(table_name)
 
         has_delete = "delete_time" in [f["Field"] for f in table_schema]
 
@@ -175,7 +173,6 @@ class VueListGenerator(BaseGenerator):
             "table_comment": self._get_table_status(table_name, "Comment"),
             "table_fields": table_fields,
             "search_fields": search_fields,
-            "enum_fields": enum_fields,
             "has_delete": has_delete,
             "batch_buttons": batch_buttons,
             "datetime": datetime

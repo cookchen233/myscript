@@ -23,45 +23,6 @@ class EnumGenerator(BaseGenerator):
     def get_template_name(self):
         return "enum.jinja2"
 
-    def _parse_enum_values(self, comment: str) -> list:
-        """从注释中解析枚举值"""
-        enum_items = []  # 改名为 enum_items
-        if '[' in comment and ']' in comment:
-            enum_part = comment[comment.find('[') + 1:comment.find(']')]
-            for item in enum_part.split(','):
-                if ':' in item:
-                    key, value = item.strip().split(':')
-                    enum_items.append({
-                        'key': key.strip(),
-                        'value': value.strip(),
-                        'constant_name': f'V{key.strip()}'
-                    })
-        return enum_items
-
-    def _get_enum_fields(self, table_name: str) -> list:
-        """获取表中的枚举字段"""
-        schema = self._get_table_schema(table_name)
-        enum_fields = []
-
-        excludes = [
-            "gender"
-        ]
-
-        for field in schema:
-            if field["Field"] in excludes:
-                continue
-
-            if field['Type'].startswith('tinyint') and not field['Field'].startswith('is_'):
-                enum_items = self._parse_enum_values(field['Comment'])  # 使用 enum_items
-                enum_field = {
-                    'field_name': field['Field'],
-                    'comment': field['Comment'],
-                    'enum_items': enum_items  # 改用 enum_items 作为键名
-                }
-                enum_fields.append(enum_field)
-        
-        return enum_fields
-
     def get_template_variables(self):
         base_name = self.file_name.replace("Enum", "")
         field_name = camel_to_snake(base_name)

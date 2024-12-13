@@ -84,12 +84,12 @@ class VueEditGenerator(BaseGenerator):
                 continue
 
             field_name = field["Field"].lower()
-            field_type = self._get_field_base_type(field)
+            base_type = self._get_field_base_type(field)
             form_type = self._get_form_type(field)
 
             # 检查注释中是否包含关联字段信息
             comment = field["Comment"]
-            if field_type == "number" and "[" in comment and "]" in comment:
+            if base_type == "number" and "[" in comment and "]" in comment:
                 try:
                     # 提取方括号中的内容
                     bracket_content = comment[comment.index("[")+1:comment.index("]")].strip()
@@ -107,7 +107,7 @@ class VueEditGenerator(BaseGenerator):
                                 "label": label,
                                 "required": "NO" in field["Null"],
                                 "form_type": form_type,
-                                "field_type": field_type,
+                                "base_type": base_type,
                                 "props": {
                                     "field": f"{table_name}Options",
                                     "class": "w-[320px]",
@@ -125,7 +125,7 @@ class VueEditGenerator(BaseGenerator):
                 "required": "NO" in field["Null"],
                 "prop": snake_to_camel(field_name),
                 "form_type": form_type,
-                "field_type": field_type,
+                "base_type": base_type,
             }
 
             # 配置属性
@@ -201,8 +201,6 @@ class VueEditGenerator(BaseGenerator):
 
         table_schema = self._get_table_schema(table_name)
         form_fields = self._get_form_fields(table_name)
-        enum_fields = self._get_enum_fields(table_name)
-        data_id_fields = self._get_data_id_fields(table_name)
 
         has_area = any(f["form_type"] == "area-selector" for f in form_fields)
         has_image = any(f["form_type"] == "image" for f in form_fields) or any(f["form_type"] == "file" for f in form_fields)
@@ -214,8 +212,6 @@ class VueEditGenerator(BaseGenerator):
             "table_name": table_name,
             "table_comment": self._get_table_status(table_name, "Comment"),
             "form_fields": form_fields,
-            "enum_fields": enum_fields,
-            "data_id_fields": data_id_fields,
             "has_area": has_area,
             "has_image": has_image,
             "has_delete": has_delete,

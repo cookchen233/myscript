@@ -52,7 +52,7 @@ const showRestore = computed(() => query.is_trashed)
 const query = reactive({
   keywords: '',
   {%- for field in search_fields %}
-  {%- if field.type == 'daterange' or field.type == 'numberrange' %}
+  {%- if field.search_type == 'daterange' or field.search_type == 'numberrange' %}
   {{ field.field }}_range: [],
   {%- else %}
   {{ field.field }}: null,
@@ -125,9 +125,9 @@ const handleBatchUpdate = async (updateData: any, message = '确定要批量更�
     <enum-provider url="/common/options" :fields="[
     'approvalStatusOptions',
   {%- for field in table_fields %}
-  {%- if field.type == 'enum' %}
+  {%- if field.display_type == 'enum' %}
     '{{ field.field|snake_to_camel }}Options',
-  {%- elif field.type == 'data-id' %}
+  {%- elif field.display_type == 'data-id' %}
     '{{ field.field[:-3]|snake_to_camel }}Options',
   {%- endif %}
   {%- endfor %}
@@ -160,15 +160,15 @@ const handleBatchUpdate = async (updateData: any, message = '确定要批量更�
         {%- for field in search_fields %}
         {%- if field.field != 'keywords' %}
         <el-form-item label="{{ field.label }}" class="mt-[20px]">
-          {%- if field.type == 'enum' %}
+          {%- if field.search_type == 'enum' %}
           <enum-selector v-model="query.{{ field.field }}" field="{{ field.field|snake_to_camel }}Options" class="w-[{{ field.width|default(200) }}px]" clearable :filterable="true" />
-          {%- elif field.type == 'data-id' %}
+          {%- elif field.search_type == 'data-id' %}
           <enum-selector v-model="query.{{ field.field }}" field="{{ field.field[:-3]|snake_to_camel }}Options" class="w-[{{ field.width|default(200) }}px]" clearable :filterable="true" />
-          {%- elif field.type == 'daterange' %}
+          {%- elif field.search_type == 'daterange' %}
           <el-date-picker v-model="query.{{ field.field }}_range" type="daterange" range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期" value-format="YYYY-MM-DD" class="w-[360px]" clearable />
-          {%- elif field.type == 'numberrange' %}
+          {%- elif field.search_type == 'numberrange' %}
           <el-input-number-range v-model="{{ field.field }}Range" @change="handle{{ field.field|snake_to_camel(True) }}RangeChange" class="w-[260px]" {% if field.min is defined %}:min="{{ field.min }}"{% endif %} {% if field.precision is defined %}:precision="{{ field.precision }}"{% endif %} clearable />
-          {%- elif field.type == 'switch' %}
+          {%- elif field.search_type == 'switch' %}
           <el-select v-model="query.{{ field.field }}" class="w-[100px]" clearable placeholder="请选择"><el-option :value="1" label="开启" /><el-option :value="0" label="关闭" /></el-select>
           {%- else %}
           <el-input-number v-model="query.{{ field.field }}" class="!w-[{{ field.width|default(120) }}px]" placeholder="请输入{{ field.label }}" {% if field.min is defined %}:min="{{ field.min }}"{% endif %} {% if field.precision is defined %}:precision="{{ field.precision }}"{% endif %} clearable />
@@ -187,21 +187,21 @@ const handleBatchUpdate = async (updateData: any, message = '确定要批量更�
       <el-table-column prop="{{ field.field }}" label="{{ field.label }}" {% if field.width %} width="{{ field.width }}"{% endif %}{% if field.align %} align="{{ field.align }}"{% endif %}{% if field.type == 'text' %} show-overflow-tooltip{% endif %}>
         {%- if field.template %}
         <template #default="{row}">
-          {%- if field.type == 'enum' %}
+          {%- if field.display_type == 'enum' %}
           <enum-label field="{{ field.field|snake_to_camel }}Options" :value="row.{{ field.field }}"/>
-          {%- elif field.type == 'data-id' %}
+          {%- elif field.display_type == 'data-id' %}
           <enum-label field="{{ field.field[:-3]|snake_to_camel }}Options" :value="row.{{ field.field }}"/>
-          {%- elif field.type == 'money' %}
+          {%- elif field.display_type == 'money' %}
           <span class="text-orange-500">¥{{ '{{ row.' + field.field + ' }}' }}</span>
-          {%- elif field.type == 'image' %}
+          {%- elif field.display_type == 'image' %}
           <file-label v-if="row.{{ field.field }}" :file-url="row.{{ field.field }}" />
-          {%- elif field.type=='file' %}
+          {%- elif field.display_type=='file' %}
           <file-label v-if="row.{{ field.field }}" :file-url="row.{{ field.field }}" height="60px" />
-          {%- elif field.type == 'switch2' %}
+          {%- elif field.display_type == 'switch2' %}
           <el-tag :type="row.{{ field.field }} ? 'success' : 'danger'" size="small">{{ '{{ row.' + field.field + ' ? "" : "" }}' }}</el-tag>
-          {%- elif field.type == 'switch' %}
+          {%- elif field.display_type == 'switch' %}
           <el-switch v-model="row.{{ field.field }}" :active-value="1" :inactive-value="0" @change="(value) => handleUpdate(row, { {{ field.field }}: value})" />
-          {%- elif field.type == 'textarea' %}
+          {%- elif field.display_type == 'textarea' %}
           <el-tooltip :content="row.{{ field.field }}" placement="top" :hide-after="2000"><span>{{ '{{ row.' + field.field + ' }}' }}</span></el-tooltip>
           {%- endif %}
         </template>

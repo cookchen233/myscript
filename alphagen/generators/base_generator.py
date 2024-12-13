@@ -76,12 +76,70 @@ class BaseGenerator(object):
         return comment.strip()
 
     def _get_rows_from_cursor(self, cursor):
-        column_names = [column[0] for column in cursor.description]
-        result = cursor.fetchall()
-        rows = []
-        for row in result:
-            rows.append(dict(zip(column_names, row)))
-        return rows
+        columns = [col[0] for col in cursor.description]
+        return [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+    def _parse_enum_values(self, comment: str) -> list:
+        """从注释中解析枚举值"""
+        enum_items = []
+        if '[' in comment and ']' in comment:
+            # 提取方括号中的内容
+            start = comment.find('[')
+            end = comment.find(']', start)
+            if end == -1:
+                return enum_items
+
+            enum_part = comment[start + 1:end]
+
+            # 处理多个方括号的情况
+            if '[' in enum_part:
+                return self._parse_enum_values(enum_part)
+
+            # 分割枚举项
+            items = [item.strip() for item in enum_part.split(',')]
+            for item in items:
+                if ':' in item:
+                    key, value = item.strip().split(':')
+                    enum_items.append({
+                        'key': key.strip(),
+                        'value': value.strip(),
+                        'constant_name': f'V{key.strip()}'
+                    })
+        return enum_items
+
+    def _get_enum_fields(self, table_name: str) -> list:
+        """获取表中的枚举字段"""
+        schema = self._get_table_schema(table_name)
+        enum_fields = []
+
+        excludes = [
+            "gender"
+        ]
+
+        for field in schema:
+            if field["Field"] in excludes:
+                continue
+
+            # 检查是否是枚举字段
+            is_enum = False
+
+            # 1. tinyint 类型且有枚举值注释
+            if field['Type'].startswith('tinyint'):
+                comment = field['Comment']
+                if '[' in comment and ']' in comment and ':' in comment:
+                    is_enum = True
+
+            if is_enum:
+                enum_items = self._parse_enum_values(field['Comment'])
+                if enum_items:  # 只有解析出枚举值才添加
+                    enum_field = {
+                        'field_name': field['Field'],
+                        'comment': field['Comment'],
+                        'enum_items': enum_items
+                    }
+                    enum_fields.append(enum_field)
+
+        return enum_fields
 
     def _get_field_base_type(self, field):
         """
@@ -164,9 +222,11 @@ class BaseGenerator(object):
         if field_name.startswith("is_") and "tinyint" in field_type:
             return "switch"
 
-        if any(word in field_name for word in ["_status", "_type", "_level"]) and "tinyint" in field_type:
+        # 检查注释是否包含枚举定义 [1:xx, 2:yy] 格式
+        if any(c.isdigit() for c in comment) and ":" in comment and "," in comment and "[" in comment and "]" in comment and base_type == "number":
             return "enum"
 
+        # 检查是否包含关联ID [id:xx] 格式
         if "[id:" in comment and "]" in comment and base_type == "number":
             return "data-id"
 
@@ -183,31 +243,6 @@ class BaseGenerator(object):
             return "textarea"
 
         return "text"
-
-    def _get_enum_fields(self, table_name):
-        """
-        获取枚举字段（不包含switch类型）
-        """
-        table_schema = self._get_table_schema(table_name)
-        enum_fields = []
-
-        for field in table_schema:
-            field_name = field["Field"].lower()
-            display_type = self._get_field_display_type(field)
-
-            # 只处理enum类型
-            if display_type == "enum":
-                enum_name = snake_to_camel(field_name)
-                options_name = enum_name + "Options"
-                enum_fields.append({
-                    "field": field_name,
-                    "enum_name": enum_name,
-                    "options_name": options_name,
-                    "comment": field["Comment"]
-                })
-
-        return enum_fields
-
 
     def get_template_name(self):
         raise NotImplementedError("Subclasses must implement get_template_name()")
