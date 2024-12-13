@@ -5,6 +5,7 @@ import { Search } from '@element-plus/icons-vue'
 import BaseList from '@/components/base-list.vue'
 import EnumSelector from "@/components/enum/enum-selector.vue"
 import EnumLabel from "@/components/enum/enum-label.vue"
+import FileLabel from "@/components/file-label.vue";
 import EnumDropdown from "@/components/enum/enum-dropdown.vue";
 import EnumStatusLabel from "@/components/enum/enum-status-label.vue"
 import {{ class_name }}Edit from './edit.vue'
@@ -112,13 +113,13 @@ const handle{{ field.field|snake_to_camel(True) }}RangeChange = (val: [number, n
   {%- endif %}
   {%- endfor %}
   ]">
-    <BaseList 
-    :api="API" 
+    <BaseList
+    :api="API"
     :edit-component="{{ class_name }}Edit"
     :on-edit-success="onEditSuccess"
     :query="query"
     :reset-query="resetQuery"
-    ref="baseListRef" 
+    ref="baseListRef"
     title="{{ table_comment }}"
     :can-delete-="false"
     :can-add-="false"
@@ -168,11 +169,13 @@ const handle{{ field.field|snake_to_camel(True) }}RangeChange = (val: [number, n
           {%- elif field.type == 'money' %}
           <span class="text-orange-500">¥{{ '{{ row.' + field.field + ' }}' }}</span>
           {%- elif field.type == 'image' %}
-          <el-image v-if="row.{{ field.field }}" :src="row.{{ field.field }}" :preview-src-list="[row.{{ field.field }}]" style="width: 80px; height: 60px" fit="cover"/>
+          <file-label v-if="row.{{ field.field }}" :file-url="row.{{ field.field }}" />
+          {%- elif field.type=='file' %}
+          <file-label v-if="row.{{ field.field }}" :file-url="row.{{ field.field }}" height="60px" />
           {%- elif field.type == 'switch2' %}
-          <el-tag :type="row.{{ field.field }} ? 'success' : 'danger'" size="small">{{ '{{ row.' + field.field + ' ? "启用" : "禁用" }}' }}</el-tag>
+          <el-tag :type="row.{{ field.field }} ? 'success' : 'danger'" size="small">{{ '{{ row.' + field.field + ' ? "" : "" }}' }}</el-tag>
           {%- elif field.type == 'switch' %}
-          <el-switch v-model="row.is_enabled" :active-value="1" :inactive-value="0" @change="(value)=> handleUpdate(row, value)" />
+          <el-switch v-model="row.{{ field.field }}" :active-value="1" :inactive-value="0" @change="(value) => handleUpdate(row, { {{ field.field }}: value})" />
           {%- elif field.type == 'textarea' %}
           <el-tooltip :content="row.{{ field.field }}" placement="top" :hide-after="2000"><span>{{ '{{ row.' + field.field + ' }}' }}</span></el-tooltip>
           {%- endif %}

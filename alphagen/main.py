@@ -1,7 +1,13 @@
 #!/usr/bin/python3
 # main.py
+import os
+import sys
 import argparse
-from generator import Generator
+
+# 添加项目根目录到Python路径
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from alphagen.generator import Generator
 
 def main():
     parser = argparse.ArgumentParser(description='代码生成工具')

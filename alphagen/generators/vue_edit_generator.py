@@ -32,7 +32,7 @@ class VueEditGenerator(BaseGenerator):
             return "date-picker"
         if "content" in field_name or "desc" in field_name or "remark" in field_name:
             return "textarea"
-                
+
         # 处理字段类型
         if "tinyint" in form_type and ("is_" in field_name or "enabled" in field_name):
             return "switch"
@@ -44,27 +44,8 @@ class VueEditGenerator(BaseGenerator):
             return "textarea"
         if "varchar" in form_type or "char" in form_type:
             return "text"
-            
+
         return "text"
-
-    def _get_enum_fields(self, table_name):
-        table_schema = self._get_table_schema(table_name)
-        enum_fields = []
-
-        for field in table_schema:
-            field_name = field["Field"].lower()
-            form_type = self._get_form_type(field)
-            if form_type == "enum":
-                enum_name = snake_to_camel(field_name)
-                options_name = enum_name + "Options"
-                enum_fields.append({
-                    "field": field_name,
-                    "enum_name": enum_name,
-                    "options_name": options_name,
-                    "comment": field["Comment"]
-                })
-
-        return enum_fields
 
     def _get_data_id_fields(self, table_name):
         table_schema = self._get_table_schema(table_name)
@@ -72,7 +53,7 @@ class VueEditGenerator(BaseGenerator):
 
         for field in table_schema:
             field_name = field["Field"].lower()
-            field_type = self._get_field_type(field)
+            field_type = self._get_field_base_type(field)
             comment = field["Comment"]
             if field_type == "number" and "[" in comment and "]" in comment:
                 try:
@@ -103,7 +84,7 @@ class VueEditGenerator(BaseGenerator):
                 continue
 
             field_name = field["Field"].lower()
-            field_type = self._get_field_type(field)
+            field_type = self._get_field_base_type(field)
             form_type = self._get_form_type(field)
 
             # 检查注释中是否包含关联字段信息
@@ -217,7 +198,7 @@ class VueEditGenerator(BaseGenerator):
     def get_template_variables(self):
         base_name = self.file_name
         table_name = self.table_prefix + camel_to_snake(base_name)
-        
+
         table_schema = self._get_table_schema(table_name)
         form_fields = self._get_form_fields(table_name)
         enum_fields = self._get_enum_fields(table_name)
@@ -226,7 +207,7 @@ class VueEditGenerator(BaseGenerator):
         has_area = any(f["form_type"] == "area-selector" for f in form_fields)
         has_image = any(f["form_type"] == "image" for f in form_fields) or any(f["form_type"] == "file" for f in form_fields)
         has_delete = "delete_time" in [f["Field"] for f in table_schema]
-        
+
         return {
             "module_name": self.module_name,
             "class_name": base_name,
@@ -243,26 +224,26 @@ class VueEditGenerator(BaseGenerator):
 
     def generate(self):
         rendered = self.render()
-        
+
         module_path = self.module_name.lower()
-        
+
         page_name = camel_to_snake(self.file_name)
         if module_path:
             prefix = f"{module_path}_"
             if page_name.startswith(prefix):
                 page_name = page_name[len(prefix):]
-        
+
         page_path = page_name.replace('_', '-')
-        
+
         file_dir = os.path.join(self.rendered_file_dir, module_path, page_path)
         filename = os.path.join(file_dir, "edit.vue")
-        
+
         if not self.force and os.path.exists(filename):
             print(f'File already exists, skipping: {filename}')
             return
-            
+
         os.makedirs(file_dir, exist_ok=True)
-        
+
         with open(filename, "w", encoding='utf-8') as f:
             f.write(rendered)
             print(f'Successfully generated: {filename}')

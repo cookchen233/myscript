@@ -2,7 +2,8 @@ from datetime import datetime
 import jinja2
 import os
 import pymysql
-from utils import *
+
+from alphagen.utils import camel_to_snake, snake_to_camel
 
 
 class BaseGenerator(object):
@@ -10,13 +11,9 @@ class BaseGenerator(object):
         self.file_name = file_name
         self.pymysql_connection = None
         self.rendered_file_dir = rendered_file_dir
-        if self.rendered_file_dir == "":
-            self.rendered_file_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                                                  "resource/rendered_files")
 
-        # 确保目录存在
-        os.makedirs(os.path.dirname(self.rendered_file_dir), exist_ok=True)
-        self.jinja2_env = jinja2.Environment(loader=jinja2.PackageLoader('resource', 'templates'))
+        templates_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), '../templates')
+        self.jinja2_env = jinja2.Environment(loader=jinja2.FileSystemLoader(templates_dir))
 
         self.jinja2_env.filters['camel_to_snake'] = camel_to_snake
         self.jinja2_env.filters['snake_to_camel'] = snake_to_camel
@@ -70,12 +67,12 @@ class BaseGenerator(object):
         """
         if not comment:
             return comment
-            
+
         # Find first [ character position
         bracket_start = comment.find('[')
         if bracket_start != -1:
             return comment[:bracket_start].strip()
-        
+
         return comment.strip()
 
     def _get_rows_from_cursor(self, cursor):
@@ -86,9 +83,9 @@ class BaseGenerator(object):
             rows.append(dict(zip(column_names, row)))
         return rows
 
-    def _get_field_type(self, field):
+    def _get_field_base_type(self, field):
         """
-        获取字段的基础数据类型
+        获取字段的基础数据类型(number,string,longtext,date,time,datetime)
         Args:
             field: 数据库字段信息字典
         Returns:
@@ -154,6 +151,63 @@ class BaseGenerator(object):
         # 默认返回文本类型
         return "string"
 
+    def _get_field_display_type(self, field):
+        """
+        获取字段在界面上的展示类型
+        """
+        field_name = field["Field"].lower()
+        field_type = field["Type"].lower()
+        base_type = self._get_field_base_type(field)
+        comment = field["Comment"]
+
+        # 通用的类型判断逻辑
+        if field_name.startswith("is_") and "tinyint" in field_type:
+            return "switch"
+
+        if any(word in field_name for word in ["_status", "_type", "_level"]) and "tinyint" in field_type:
+            return "enum"
+
+        if "[id:" in comment and "]" in comment and base_type == "number":
+            return "data-id"
+
+        if "img" in field_name:
+            return "image"
+
+        if "file" in field_name or "files" in field_name:
+            return "file"
+
+        if "_time" in field_name or "_date" in field_name or base_type == "datetime" or base_type == "date":
+            return "datetime"
+
+        if base_type == "longtext":
+            return "textarea"
+
+        return "text"
+
+    def _get_enum_fields(self, table_name):
+        """
+        获取枚举字段（不包含switch类型）
+        """
+        table_schema = self._get_table_schema(table_name)
+        enum_fields = []
+
+        for field in table_schema:
+            field_name = field["Field"].lower()
+            display_type = self._get_field_display_type(field)
+
+            # 只处理enum类型
+            if display_type == "enum":
+                enum_name = snake_to_camel(field_name)
+                options_name = enum_name + "Options"
+                enum_fields.append({
+                    "field": field_name,
+                    "enum_name": enum_name,
+                    "options_name": options_name,
+                    "comment": field["Comment"]
+                })
+
+        return enum_fields
+
 
     def get_template_name(self):
         raise NotImplementedError("Subclasses must implement get_template_name()")
@@ -183,7 +237,7 @@ class BaseGenerator(object):
         now = datetime.now()
         formatted_date = now.strftime("%B %d, %Y")  # Format: November 29, 2024
         formatted_time = now.strftime("%H:%M:%S")    # Format: 21:07:04
-        
+
         header = f"""<?php
 /**
  * This file is auto-generated.
@@ -195,6 +249,10 @@ class BaseGenerator(object):
 
     def generate(self):
         rendered = self._add_file_header(self.render())
+
+        if self.rendered_file_dir == "":
+            self.rendered_file_dir = os.path.join(os.path.dirname(os.path.realpath(__file__) + "/.../"), "rendered_files")
+        os.makedirs(os.path.dirname(self.rendered_file_dir), exist_ok=True)
         filename = os.path.join(self.rendered_file_dir, self.file_name + ".php")
 
         # 确保目录存在
@@ -207,5 +265,3 @@ class BaseGenerator(object):
         with open(filename, "w", encoding='utf-8') as f:
             f.write(rendered)
             print(f'Successfully generated: {filename}')
-
-    

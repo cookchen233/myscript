@@ -107,4 +107,3 @@ tmp.*
 .cache/
 **/__pycache__/
 *.pyc
-**/rendered_files/
