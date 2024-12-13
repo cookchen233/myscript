@@ -17,6 +17,9 @@ class ModelGenerator(BaseGenerator):
         base_name = self.file_name.replace("Model", "")
         table_name = self.table_prefix + camel_to_snake(base_name)
 
+        table_schema = self._get_table_schema(table_name)
+        relations = self._get_model_relations(table_schema)
+
         return dict(
             table_name=table_name,
             table_prefix=self.table_prefix,
@@ -24,12 +27,12 @@ class ModelGenerator(BaseGenerator):
             class_name=self.file_name,
             model_variable_name="$" + snake_to_camel(camel_to_snake(self.file_name)),
             table_comment=self._get_table_status(table_name, "Comment"),
-            properties=self._get_model_properties(table_name),
-            datetime=datetime  # 添加 datetime 对象
+            properties=self._get_model_properties(table_schema),
+            relations=relations,
+            datetime=datetime
         )
 
-    def _get_model_properties(self, table_name):
-        table_schema = self._get_table_schema(table_name)
+    def _get_model_properties(self, table_schema):
         model_properties = []
         for field in table_schema:
             if 'int' in field["Type"] or 'float' in field["Type"] or 'decimal' in field["Type"]:
@@ -46,6 +49,34 @@ class ModelGenerator(BaseGenerator):
             )
             model_properties.append(model_property)
         return model_properties
+
+    def _get_model_relations(self, table_schema):
+        """获取模型关联关系"""
+        relations = []
+        for field in table_schema:
+            field_name = field["Field"]
+            comment = field["Comment"]
+            
+            # 检查是否是外键关联字段
+            if field_name.endswith("_id") and "[id:" in comment:
+                # 从注释中提取关联表名
+                match = re.search(r'\[id:(\w+)\]', comment)
+                if match:
+                    relation_table = self.module_name + "_" + match.group(1)
+                    relation_name = field_name.replace("_id", "")
+                    
+                    # 构建关联配置
+                    relation = {
+                        "name": relation_name,
+                        "type": "belongsTo",
+                        "model": snake_to_camel(relation_table, True) + "Model",
+                        "foreign_key": field_name,
+                        "local_key": "id",
+                        "comment": f"关联{relation_table}表"
+                    }
+                    relations.append(relation)
+        
+        return relations
 
     def generate(self):
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
