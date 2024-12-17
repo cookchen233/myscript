@@ -24,7 +24,7 @@ class {{class_name}} extends BaseModel
      * {{ relation.comment }}
      * @return \think\model\relation\{{ relation.type }}
      */
-    public function {{ relation.name }}()
+    public function {{ relation.name|snake_to_camel }}()
     {
         return $this->{{ relation.type }}(
             {{ relation.model }}::class,  // 关联模型

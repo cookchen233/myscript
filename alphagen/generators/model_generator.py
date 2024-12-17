@@ -56,7 +56,7 @@ class ModelGenerator(BaseGenerator):
         for field in table_schema:
             field_name = field["Field"]
             comment = field["Comment"]
-            
+
             # 检查是否是外键关联字段
             if field_name.endswith("_id") and "[id:" in comment:
                 # 从注释中提取关联表名
@@ -64,7 +64,7 @@ class ModelGenerator(BaseGenerator):
                 if match:
                     relation_table = self.module_name + "_" + match.group(1)
                     relation_name = field_name.replace("_id", "")
-                    
+
                     # 构建关联配置
                     relation = {
                         "name": relation_name,
@@ -72,10 +72,10 @@ class ModelGenerator(BaseGenerator):
                         "model": snake_to_camel(relation_table, True) + "Model",
                         "foreign_key": field_name,
                         "local_key": "id",
-                        "comment": f"关联{relation_table}表"
+                        "comment": f"关联{camel_to_snake(relation_table)}表"
                     }
                     relations.append(relation)
-        
+
         return relations
 
     def generate(self):
