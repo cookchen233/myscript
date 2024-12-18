@@ -2,6 +2,8 @@
 # generator.py
 import os
 from typing import List
+
+from alphagen.generators.api_doc import ApiDocListGenerator, ApiDocDetailGenerator
 from config import DEFAULT_CONFIGS
 from generators.model_generator import ModelGenerator
 from generators.controller_generator import ControllerGenerator
@@ -35,10 +37,10 @@ class Generator:
             raise ValueError("路径不能为空")
 
         parts = path.split('/')
-        
+
         if len(parts) > 2:
             raise ValueError("路径格式错误，应该是: module_name/table_name 或 table_name")
-            
+
         if len(parts) == 2:
             # 包含模块名: admin/user
             module_name, table_name = parts
@@ -81,6 +83,27 @@ class Generator:
             controller_generator.set_table_prefix(self.table_prefix)
             controller_generator.set_force(self.force)
             controller_generator.generate()
+
+            # 生成接口文档
+            api_doc_list_generator = ApiDocListGenerator(
+                class_name,
+                os.path.join(self.base_paths['api_doc'], module_name)
+            )
+            api_doc_list_generator.set_mysql_connection(**self.mysql_config)
+            api_doc_list_generator.set_module_name(module_name)
+            api_doc_list_generator.set_table_prefix(self.table_prefix)
+            api_doc_list_generator.set_force(self.force)
+            api_doc_list_generator.generate()
+
+            api_doc_detail_generator = ApiDocDetailGenerator(
+                class_name,
+                os.path.join(self.base_paths['api_doc'], module_name)
+            )
+            api_doc_detail_generator.set_mysql_connection(**self.mysql_config)
+            api_doc_detail_generator.set_module_name(module_name)
+            api_doc_detail_generator.set_table_prefix(self.table_prefix)
+            api_doc_detail_generator.set_force(self.force)
+            api_doc_detail_generator.generate()
 
             # 生成Bean
             # bean_generator = BeanGenerator(
@@ -125,7 +148,7 @@ class Generator:
             vue_edit_generator.set_table_prefix(self.table_prefix)
             vue_edit_generator.set_force(self.force)
             vue_edit_generator.generate()
-            
+
             # 生成list.vue
             vue_list_generator = VueListGenerator(
                 class_name,
@@ -147,21 +170,21 @@ class Generator:
         try:
             module_name, table_name = self.parse_path(path)
             table_name_with_prefix = self.table_prefix + table_name  # 加上表前缀
-            
+
             # 创建枚举生成器实例来检查表结构
             temp_generator = EnumGenerator("TempEnum")
             temp_generator.set_mysql_connection(**self.mysql_config)
             temp_generator.set_table_name(table_name)  # 设置完整的表名
-            
+
             # 直接使用完整表名获取枚举字段
             enum_fields = temp_generator._get_enum_fields(table_name_with_prefix)
-            
+
             # 只有当存在枚举字段时才生成对应的枚举类
             if enum_fields:
                 for field in enum_fields:
                     # 为每个枚举字段生成一个独立的枚举类
                     enum_class_name = snake_to_camel(field['field_name'], True) + ""
-                    
+
                     enum_generator = EnumGenerator(
                         enum_class_name,
                         os.path.join(self.base_paths['enum'], module_name)
@@ -172,7 +195,7 @@ class Generator:
                     enum_generator.set_table_name(table_name)  # 设置完整的表名
                     enum_generator.set_force(self.force)
                     enum_generator.generate()
-                    
+
                     print(f"Generated enum class for field: {field['field_name']}")
             else:
                 print(f"No enum fields found in table: {table_name_with_prefix}")

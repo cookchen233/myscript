@@ -8,6 +8,8 @@ from alphagen.utils import camel_to_snake, snake_to_camel
 
 class BaseGenerator(object):
     def __init__(self, file_name, rendered_file_dir=""):
+        self.table_prefix = None
+        self.module_name = None
         self.file_name = file_name
         self.pymysql_connection = None
         self.rendered_file_dir = rendered_file_dir
@@ -19,6 +21,15 @@ class BaseGenerator(object):
         self.jinja2_env.filters['snake_to_camel'] = snake_to_camel
 
         self.force = False  # 添加force属性
+
+    def set_module_name(self, module_name):
+        self.module_name = module_name
+
+    def set_table_prefix(self, prefix):
+        self.table_prefix = prefix
+
+    def generated_file_name(self):
+        return self.file_name+".php"
 
     def set_force(self, force):
         self.force = force
@@ -288,7 +299,7 @@ class BaseGenerator(object):
         if self.rendered_file_dir == "":
             self.rendered_file_dir = os.path.join(os.path.dirname(os.path.realpath(__file__) + "/.../"), "rendered_files")
         os.makedirs(os.path.dirname(self.rendered_file_dir), exist_ok=True)
-        filename = os.path.join(self.rendered_file_dir, self.file_name + ".php")
+        filename = os.path.join(self.rendered_file_dir, self.generated_file_name())
 
         # 确保目录存在
         os.makedirs(os.path.dirname(filename), exist_ok=True)

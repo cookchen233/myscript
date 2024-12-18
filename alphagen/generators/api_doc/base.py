@@ -1,0 +1,144 @@
+import os
+import re
+from datetime import datetime
+from jinja2 import Environment, FileSystemLoader
+
+from ..base_generator import BaseGenerator, camel_to_snake, snake_to_camel
+
+class ApiDocBaseGenerator(BaseGenerator):
+    def __init__(self, file_name, rendered_file_dir=""):
+        super().__init__(file_name, rendered_file_dir)
+        self.module_name = ""
+        self.table_prefix = ""
+
+    def generated_file_name(self):
+        return self.get_doc_type() + ".http"
+
+    def get_template_variables(self):
+        """获取模板变量"""
+        base_name = self.file_name.replace("Model", "")
+        table_name = self.table_prefix + camel_to_snake(base_name)
+
+        # 获取中文表名（从表注释中提取）
+        table_comment = self._get_table_status(table_name, "Comment")
+        if not table_comment:
+            table_comment = table_name
+
+        # 移除表注释中可能的额外描述（通常在括号内）
+        table_comment = re.sub(r'\(.*?\)', '', table_comment).strip()
+
+        table_schema = self._get_table_schema(table_name)
+        relations = self._get_model_relations(table_schema)
+
+        display_name = f"{table_comment}{self.get_doc_type()}"
+
+        return dict(
+            table_name=table_name,
+            table_prefix=self.table_prefix,
+            module_name=self.module_name,
+            class_name=self.file_name,
+            display_name=display_name,
+            model_variable_name="$" + snake_to_camel(camel_to_snake(self.file_name)),
+            table_comment=table_comment,
+            properties=self._get_model_properties(table_schema),
+            relations=relations,
+            datetime=datetime
+        )
+
+    def _should_be_parameter(self, field_name, field_type, comment):
+        """判断字段是否应该作为API参数"""
+        # 常见的不作为参数的字段
+        non_param_fields = {'content', 'detail', 'description', 'desc', 'remark', 'deleted_time', 'create_time', 'update_time'}
+
+        # 常见的作为参数的字段后缀
+        param_suffixes = {'_id', '_type', '_status', '_time', '_date', '_no', '_code'}
+
+        # 如果字段名在非参数列表中，直接返回False
+        if field_name in non_param_fields:
+            return False
+
+        # 检查字段名后缀
+        for suffix in param_suffixes:
+            if field_name.endswith(suffix):
+                return True
+
+        # 检查字段类型，大文本类型通常不是参数
+        if 'text' in field_type.lower() or 'json' in field_type.lower():
+            return False
+
+        # 基础类型通常可以作为参数
+        if any(t in field_type.lower() for t in ['int', 'tinyint', 'smallint', 'char', 'date']):
+            return True
+
+        return False
+
+    def _get_model_properties(self, table_schema):
+        model_properties = []
+        for field in table_schema:
+            field_type = field["Type"]
+            field_name = field["Field"]
+            comment = field["Comment"]
+
+            if 'int' in field_type or 'float' in field_type or 'decimal' in field_type:
+                property_type = "int"
+            else:
+                property_type = "string"
+
+            is_parameter = self._should_be_parameter(field_name, field_type, comment)
+
+            model_property = dict(
+                name=snake_to_camel(field_name),
+                property_type=property_type,
+                field_name=field_name,
+                field_comment=comment,
+                is_parameter=is_parameter,
+                set_method_name=snake_to_camel("set_" + field_name),
+                get_method_name=snake_to_camel("get_" + field_name),
+            )
+            model_properties.append(model_property)
+        return model_properties
+
+    def _get_model_relations(self, table_schema):
+        """获取模型关联关系"""
+        relations = []
+        for field in table_schema:
+            field_name = field["Field"]
+            comment = field["Comment"]
+
+            # 检查是否是外键关联字段
+            if field_name.endswith("_id") and "[id:" in comment:
+                # 从注释中提取关联表名
+                match = re.search(r'\[id:(\w+)\]', comment)
+                if match:
+                    relation_table = self.module_name + "_" + match.group(1)
+                    relation_name = field_name.replace("_id", "")
+
+                    # 构建关联配置
+                    relation = {
+                        "name": relation_name,
+                        "type": "belongsTo",
+                        "model": snake_to_camel(relation_table, True) + "Model",
+                        "foreign_key": field_name,
+                        "local_key": "id",
+                        "comment": f"关联{camel_to_snake(relation_table)}表"
+                    }
+                    relations.append(relation)
+
+        return relations
+
+
+    def _add_file_header(self, content: str) -> str:
+        """Add a file header comment."""
+        now = datetime.now()
+        formatted_date = now.strftime("%B %d, %Y")  # Format: November 29, 2024
+        formatted_time = now.strftime("%H:%M:%S")    # Format: 21:07:04
+
+        header = f"""# This file is auto-generated.
+# If you delete the tag "@generated ...", this file will not be generated again.
+# @generated by AlphaGenerator on {formatted_date}, at {formatted_time}
+"""
+        return header + content
+
+    def get_doc_type(self):
+        """获取文档类型 - 由子类实现"""
+        raise NotImplementedError
