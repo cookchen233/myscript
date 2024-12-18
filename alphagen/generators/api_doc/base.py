@@ -11,6 +11,19 @@ class ApiDocBaseGenerator(BaseGenerator):
         self.module_name = ""
         self.table_prefix = ""
 
+        # 常见的不作为参数的字段
+        self.non_param_fields = {
+            'content', 'detail', 'description', 'desc', 'remark',
+            'deleted_time', 'create_time', 'update_time', 'preview_img',
+            'imgs', 'files', 'attachments',
+            'site_id',
+        }
+
+        # 在返回结果中要排除的字段
+        self.exclude_response_fields = {
+            'site_id', 'delete_time'
+        }
+
     def generated_file_name(self):
         return self.get_doc_type() + ".http"
 
@@ -46,31 +59,8 @@ class ApiDocBaseGenerator(BaseGenerator):
         )
 
     def _should_be_parameter(self, field_name, field_type, comment):
-        """判断字段是否应该作为API参数"""
-        # 常见的不作为参数的字段
-        non_param_fields = {'content', 'detail', 'description', 'desc', 'remark', 'deleted_time', 'create_time', 'update_time'}
-
-        # 常见的作为参数的字段后缀
-        param_suffixes = {'_id', '_type', '_status', '_time', '_date', '_no', '_code'}
-
-        # 如果字段名在非参数列表中，直接返回False
-        if field_name in non_param_fields:
-            return False
-
-        # 检查字段名后缀
-        for suffix in param_suffixes:
-            if field_name.endswith(suffix):
-                return True
-
-        # 检查字段类型，大文本类型通常不是参数
-        if 'text' in field_type.lower() or 'json' in field_type.lower():
-            return False
-
-        # 基础类型通常可以作为参数
-        if any(t in field_type.lower() for t in ['int', 'tinyint', 'smallint', 'char', 'date']):
-            return True
-
-        return False
+        """判断字段是否应该作为API参数 - 由子类实现"""
+        raise NotImplementedError
 
     def _get_model_properties(self, table_schema):
         model_properties = []
@@ -79,24 +69,80 @@ class ApiDocBaseGenerator(BaseGenerator):
             field_name = field["Field"]
             comment = field["Comment"]
 
-            if 'int' in field_type or 'float' in field_type or 'decimal' in field_type:
-                property_type = "int"
-            else:
-                property_type = "string"
+            # 如果字段在排除列表中，跳过
+            if field_name in self.exclude_response_fields:
+                continue
 
-            is_parameter = self._should_be_parameter(field_name, field_type, comment)
+            property_type = self._get_property_type(field_type)
+            example_value = self._get_example_value(field_name, field_type, property_type)
 
             model_property = dict(
                 name=snake_to_camel(field_name),
                 property_type=property_type,
                 field_name=field_name,
                 field_comment=comment,
-                is_parameter=is_parameter,
+                is_parameter=self._should_be_parameter(field_name, field_type, comment),
+                example_value=example_value,
                 set_method_name=snake_to_camel("set_" + field_name),
                 get_method_name=snake_to_camel("get_" + field_name),
             )
             model_properties.append(model_property)
         return model_properties
+
+    def _get_property_type(self, field_type):
+        """获取属性类型"""
+        if any(t in field_type.lower() for t in ['int', 'float', 'decimal', 'double', 'tinyint']):
+            return "int"
+        elif 'datetime' in field_type.lower() or 'timestamp' in field_type.lower():
+            return "datetime"
+        elif 'date' in field_type.lower():
+            return "date"
+        elif 'time' in field_type.lower():
+            return "time"
+        else:
+            return "string"
+
+    def _get_example_value(self, field_name, field_type, property_type):
+        """获取示例值"""
+        # 特殊字段名处理
+        if field_name.endswith('_status'):
+            return 1
+        elif field_name.endswith('_type'):
+            return 1
+        elif field_name == 'id' or field_name.endswith('_id'):
+            return 1
+        elif field_name in {'is_deleted', 'is_enabled', 'is_visible', 'is_active'}:
+            return 0
+        elif 'phone' in field_name:
+            return "13800138000"
+        elif 'email' in field_name:
+            return "example@example.com"
+        elif field_name == 'page':
+            return 1
+        elif field_name == 'page_size':
+            return 20
+
+        # 根据类型处理
+        if property_type == "int":
+            return 0
+        elif property_type == "datetime":
+            return "2024-01-01 00:00:00"
+        elif property_type == "date":
+            return "2024-01-01"
+        elif property_type == "time":
+            return "00:00:00"
+        else:
+            # 如果字段名包含name或title，返回更有意义的示例值
+            if 'name' in field_name or 'title' in field_name:
+                return "标题 ..."
+            elif 'keyword' in field_name:
+                return "关键词"
+            elif 'remark' in field_name or 'desc' in field_name:
+                return "说明 ..."
+            elif 'img' in field_name:
+                return "xx.png"
+            else:
+                return ""
 
     def _get_model_relations(self, table_schema):
         """获取模型关联关系"""
