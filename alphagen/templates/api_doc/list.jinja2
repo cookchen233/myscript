@@ -8,7 +8,7 @@ curl 'https://localhost:9091/api/{{ module_name }}.{{ class_name }}/list/' \
     "page_size":20,
     {% for property in properties -%}
     {% if property.is_parameter %}
-    "{{ property.field_name }}":"{{ property.example_value }}",
+    "{{ property.field_name }}":{% if property.property_type == "string" %}"{{ property.example_value }}"{% else %}{{ property.example_value }}{% endif %},
     "--{{ property.field_comment or table_comment+property.field_name }}":"",
     {% endif %}
     {%- endfor %}
