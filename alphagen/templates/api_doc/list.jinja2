@@ -28,9 +28,9 @@ curl 'https://localhost:9091/api/{{ module_name }}.{{ class_name }}/list/' \
       "last_page": 2,
       "data": [
         {
-            {%- for property in properties %}
-            "{{ property.field_name }}": {% if property.property_type == "string" %}"{{ property.example_value }}"{% else %}{{ property.example_value }}{% endif %}, //{{ property.field_comment or table_comment+property.field_name }}
-            {%- endfor %}
+          {%- for property in properties %}
+          "{{ property.field_name }}": {% if property.property_type == "string" %}"{{ property.example_value }}"{% else %}{{ property.example_value }}{% endif %}, //{{ property.field_comment or table_comment+property.field_name }}
+          {%- endfor %}
         }
       ]
     }
@@ -39,3 +39,16 @@ curl 'https://localhost:9091/api/{{ module_name }}.{{ class_name }}/list/' \
 }
 
 ### 测试区域, 可随意修改
+curl 'https://localhost:9091/api/{{ module_name }}.{{ class_name }}/list/' \
+  -H 'Content-Type: application/json'\
+  -H 'site-id: 18' \
+  -d '{
+    "page":1,
+    "page_size":20,
+    {% for property in properties -%}
+    {%- if property.is_parameter -%}
+    "{{ property.field_name }}":{% if property.property_type == "string" %}"{{ property.example_value }}"{% else %}{{ property.example_value }}{% endif %},
+    {% endif %}
+    {%- endfor -%}
+    "--":""
+    }'

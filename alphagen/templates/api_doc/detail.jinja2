@@ -27,3 +27,14 @@ curl 'https://localhost:9091/api/{{ module_name }}.{{ class_name }}/detail/' \
 }
 
 ### 测试区域, 可随意修改
+curl 'https://localhost:9091/api/{{ module_name }}.{{ class_name }}/detail/' \
+  -H 'Content-Type: application/json'\
+  -H 'site-id: 18' \
+  -d '{
+    {% for property in properties -%}
+    {%- if property.is_parameter -%}
+    "{{ property.field_name }}":{% if property.property_type == "string" %}"{{ property.example_value }}"{% else %}{{ property.example_value }}{% endif %},
+    {% endif %}
+    {%- endfor -%}
+    "--":""
+    }'
