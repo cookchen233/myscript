@@ -1,0 +1,28 @@
+
+### {{ display_name }}
+curl 'https://api.13012345822.com/api/{{ module_name }}.{{ class_name }}/update/' \
+  -H 'Content-Type: application/json'\
+  -H 'site-id: {{ site_id }}' \
+  -d '{
+    {% for property in properties -%}
+    {% if property.is_parameter %}
+    "{{ property.field_name }}":{% if property.property_type == "string" %}"{{ property.example_value }}"{% else %}{{ property.example_value }}{% endif %},
+    "--{{ property.field_comment or table_comment+property.field_name }}":"",
+    {% endif %}
+    {%- endfor %}
+    "--":""
+  }'
+
+# 返回:
+{
+  "code": 1,
+  "msg": "SUCCESS",
+  "rid": "4143fy3ry8w8ucpe",
+  "data": {
+    {%- for property in properties %}
+    "{{ property.field_name }}": {% if property.property_type == "string" %}"{{ property.example_value }}"{% else %}{{ property.example_value }}{% endif %}{% if not loop.last %},{% endif %} //{{ property.field_comment or table_comment+property.field_name }}
+    {%- endfor %}
+  },
+  "ref": null
+}
+

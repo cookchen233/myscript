@@ -5,6 +5,7 @@ DEFAULT_CONFIGS = {
         'api_doc': "/Users/Chen/Coding/api-doc/main",
         'enum': "/Users/Chen/Coding/phpcode/app/common/enum",
         'controller': "/Users/Chen/Coding/phpcode/app/admin/controller",
+        'api_controller': "/Users/Chen/Coding/phpcode/app/api/controller",
         'bean': "/Users/Chen/Coding/phpcode/app/common/bean",
         'dao': "/Users/Chen/Coding/phpcode/app/common/dao",
         'basic_dao': "/Users/Chen/Coding/phpcode/app/common/dao",

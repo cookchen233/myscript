@@ -3,10 +3,11 @@
 import os
 from typing import List
 
-from alphagen.generators.api_doc import ApiDocListGenerator, ApiDocReadGenerator
+from alphagen.generators.api_doc import ApiDocListGenerator, ApiDocReadGenerator, ApiDocCreateGenerator, ApiDocUpdateGenerator, ApiDocDeleteGenerator
 from config import DEFAULT_CONFIGS
 from generators.model_generator import ModelGenerator
 from generators.controller_generator import ControllerGenerator
+from generators.api_controller_generator import ApiControllerGenerator
 from generators.bean_generator import BeanGenerator
 from generators.dao_generator import DaoGenerator, BasicDaoGenerator
 from generators.dto_generator import DtoGenerator
@@ -88,6 +89,17 @@ class Generator:
             controller_generator.set_force(self.force)
             controller_generator.generate()
 
+            # 生成前端控制器
+            api_controller_generator = ApiControllerGenerator(
+                class_name,
+                os.path.join(self.base_paths['api_controller'], module_name)
+            )
+            api_controller_generator.set_mysql_connection(**self.mysql_config)
+            api_controller_generator.set_module_name(module_name)
+            api_controller_generator.set_table_prefix(self.table_prefix)
+            api_controller_generator.set_force(self.force)
+            api_controller_generator.generate()
+
             # 生成接口文档
             api_doc_list_generator = ApiDocListGenerator(
                 class_name,
@@ -110,6 +122,39 @@ class Generator:
             api_doc_read_generator.set_force(self.force)
             api_doc_read_generator.set_site_id(self.site_id)
             api_doc_read_generator.generate()
+
+            api_doc_create_generator = ApiDocCreateGenerator(
+                class_name,
+                os.path.join(self.base_paths['api_doc'], module_name)
+            )
+            api_doc_create_generator.set_mysql_connection(**self.mysql_config)
+            api_doc_create_generator.set_module_name(module_name)
+            api_doc_create_generator.set_table_prefix(self.table_prefix)
+            api_doc_create_generator.set_force(self.force)
+            api_doc_create_generator.set_site_id(self.site_id)
+            api_doc_create_generator.generate()
+
+            api_doc_update_generator = ApiDocUpdateGenerator(
+                class_name,
+                os.path.join(self.base_paths['api_doc'], module_name)
+            )
+            api_doc_update_generator.set_mysql_connection(**self.mysql_config)
+            api_doc_update_generator.set_module_name(module_name)
+            api_doc_update_generator.set_table_prefix(self.table_prefix)
+            api_doc_update_generator.set_force(self.force)
+            api_doc_update_generator.set_site_id(self.site_id)
+            api_doc_update_generator.generate()
+
+            api_doc_delete_generator = ApiDocDeleteGenerator(
+                class_name,
+                os.path.join(self.base_paths['api_doc'], module_name)
+            )
+            api_doc_delete_generator.set_mysql_connection(**self.mysql_config)
+            api_doc_delete_generator.set_module_name(module_name)
+            api_doc_delete_generator.set_table_prefix(self.table_prefix)
+            api_doc_delete_generator.set_force(self.force)
+            api_doc_delete_generator.set_site_id(self.site_id)
+            api_doc_delete_generator.generate()
 
             # 生成Bean
             # bean_generator = BeanGenerator(

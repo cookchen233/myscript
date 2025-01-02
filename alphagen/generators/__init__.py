@@ -5,14 +5,16 @@ from .dto_generator import DtoGenerator
 from .vue_edit_generator import VueEditGenerator
 from .vue_list_generator import VueListGenerator
 from .controller_generator import ControllerGenerator
+from .api_controller_generator import ApiControllerGenerator
 
 __all__ = [
     'ModelGenerator',
     'BeanGenerator',
     'DaoGenerator',
     'BasicDaoGenerator',
-    'DtoGenerator'
-    'VueEditGenerator'
-    'VueListGenerator'
-    'ControllerGenerator'
+    'DtoGenerator',
+    'VueEditGenerator',
+    'VueListGenerator',
+    'ControllerGenerator',
+    'ApiControllerGenerator',
 ]

@@ -1,0 +1,33 @@
+<?php
+declare(strict_types=1);
+
+namespace app\api\controller{% if module_name %}\{{ module_name }}{% endif %};
+{% if module_name %}
+use app\api\controller\CrudController;{% endif %}
+
+use app\common\model{% if module_name %}\{{ module_name }}{% endif %}\{{class_name}}Model;
+use think\response\Json;
+
+/**
+ * {{table_comment}}
+*/
+class {{class_name}} extends CrudController
+{
+    protected function initialize()
+    {
+        $this->model = new {{class_name}}Model();
+        parent::initialize();
+    }
+
+    public function create(): Json {
+        return fail("该功能暂未实现");
+    }
+
+    public function update(int $id): Json {
+        return fail("该功能暂未实现");
+    }
+
+    public function delete(int $id): Json {
+        return fail("该功能暂未实现");
+    }
+}
