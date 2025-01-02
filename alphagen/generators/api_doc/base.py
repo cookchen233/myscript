@@ -25,20 +25,25 @@ class ApiDocBaseGenerator(BaseGenerator):
         }
 
     def generated_file_name(self):
-        return self.get_doc_type() + ".http"
+        return f"{self.get_table_comment()}{self.get_doc_type()}.http"
+
+    def get_table_comment(self):
+        # 获取中文表名（从表注释中提取）
+        base_name = self.file_name.replace("Model", "")
+        table_name = self.table_prefix + camel_to_snake(base_name)
+        table_comment = self._get_table_status(table_name, "Comment")
+        if not table_comment:
+            table_comment = table_name
+
+        # 移除表注释中可能的额外描述（通常在括号内）
+        return re.sub(r'\(.*?\)', '', table_comment).strip()
 
     def get_template_variables(self):
         """获取模板变量"""
         base_name = self.file_name.replace("Model", "")
         table_name = self.table_prefix + camel_to_snake(base_name)
 
-        # 获取中文表名（从表注释中提取）
-        table_comment = self._get_table_status(table_name, "Comment")
-        if not table_comment:
-            table_comment = table_name
-
-        # 移除表注释中可能的额外描述（通常在括号内）
-        table_comment = re.sub(r'\(.*?\)', '', table_comment).strip()
+        table_comment = self.get_table_comment()
 
         table_schema = self._get_table_schema(table_name)
         relations = self._get_model_relations(table_schema)

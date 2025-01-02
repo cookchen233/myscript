@@ -103,7 +103,7 @@ class VueListGenerator(BaseGenerator):
                 'member_id',
                 'create_time',
                 'update_time', 'delete_time',
-                'preview_img', 'imgs', 'images', 'description', 'url', 'content', 'remark'
+                'preview_img', 'preview_image', 'main_image', 'imgs', 'images', 'description', 'url', 'content', 'remark'
             ]
             if field_name in exclude_fields:
                 continue

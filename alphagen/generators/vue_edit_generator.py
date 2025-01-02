@@ -20,7 +20,7 @@ class VueEditGenerator(BaseGenerator):
             return "enum"
         if "area" in field_name or "region" in field_name:
             return "area-selector"
-        if "img" in field_name:
+        if "img" in field_name or "image" in field_name:
             return "select-image"
         if "imgs" in field_name or "images" in field_name:
             return "select-image"
@@ -172,14 +172,14 @@ class VueEditGenerator(BaseGenerator):
             elif form_type == "select-image":
                 props.update({
                     "type": "image",
-                    "multiple": "imgs" in field_name or "images" in field_name,
+                    "multiple": "imgs" in field_name or "image" in field_name,
                     "limit": 15 if "imgs" in field_name or "images" in field_name else 1
                 })
 
             elif form_type == "select-file":
                 props.update({
                     "type": "image",
-                    "multiple": "imgs" in field_name or "images" in field_name,
+                    "multiple": "imgs" in field_name or "image" in field_name,
                     "limit": 15 if "imgs" in field_name or "images" in field_name else 1
                 })
 

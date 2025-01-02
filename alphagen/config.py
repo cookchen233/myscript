@@ -2,7 +2,7 @@
 DEFAULT_CONFIGS = {
     'paths': {
         'model': "/Users/Chen/Coding/phpcode/app/common/model",
-        'api_doc': "/Users/Chen/Coding/api-doc",
+        'api_doc': "/Users/Chen/Coding/api-doc/main",
         'enum': "/Users/Chen/Coding/phpcode/app/common/enum",
         'controller': "/Users/Chen/Coding/phpcode/app/admin/controller",
         'bean': "/Users/Chen/Coding/phpcode/app/common/bean",

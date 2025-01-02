@@ -241,7 +241,7 @@ class BaseGenerator(object):
         if "[id:" in comment and "]" in comment and base_type == "number":
             return "data-id"
 
-        if "img" in field_name:
+        if "_img" in field_name or "_image" in field_name:
             return "image"
 
         if "file" in field_name or "files" in field_name:
@@ -260,6 +260,61 @@ class BaseGenerator(object):
 
     def get_template_variables(self):
         raise NotImplementedError("Subclasses must implement get_template_variables()")
+
+    def _get_model_properties(self, table_name):
+        table_schema = self._get_table_schema(table_name)
+        model_properties = []
+
+        # 排除的字段列表
+        exclude_fields = ['password', 'delete_time', 'update_time',
+                          'site_id', 'create_time', 'id']
+
+        for field in table_schema:
+            field_name = field["Field"].lower()
+            field_type = field["Type"].lower()
+
+            # 确定字段类型
+            if any(t in field_type for t in ['int', 'float', 'decimal']):
+                property_type = "int"
+                example_value = 1
+            elif 'datetime' in field_type:
+                property_type = "string"
+                example_value = "2024-01-01 00:00:00"
+            elif 'date' in field_type:
+                property_type = "string"
+                example_value = "2024-01-01"
+            else:
+                property_type = "string"
+                example_value = "示例文本"
+
+            # 特殊字段的示例值处理
+            if 'status' in field_name or 'type' in field_name or 'level' in field_name:
+                example_value = 1
+            elif 'email' in field_name:
+                example_value = "example@domain.com"
+            elif 'phone' in field_name or 'mobile' in field_name:
+                example_value = "13800138000"
+            elif 'url' in field_name or 'website' in field_name:
+                example_value = "http://example.com"
+            elif ('enabled' in field_name or 'disabled' in field_name or 'is_' in field_name) and 'tinyint' in field_type:
+                example_value = 1
+
+            # 判断是否作为参数
+            is_parameter = field["Field"] not in exclude_fields and 'text' not in field_type
+
+            model_property = dict(
+                name=snake_to_camel(field["Field"]),
+                property_type=property_type,
+                field_name=field["Field"],
+                field_comment=field["Comment"],
+                is_parameter=is_parameter,
+                example_value=example_value,
+                set_method_name=snake_to_camel("set_" + field["Field"]),
+                get_method_name=snake_to_camel("get_" + field["Field"]),
+            )
+            model_properties.append(model_property)
+
+        return model_properties
 
     def render(self):
         template = self.jinja2_env.get_template(self.get_template_name())
