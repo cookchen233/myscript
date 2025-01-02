@@ -34,6 +34,9 @@ class BaseGenerator(object):
     def set_force(self, force):
         self.force = force
 
+    def set_site_id(self, site_id):
+        self.site_id = site_id
+
     def __del__(self):
         if hasattr(self, 'pymysql_connection') and self.pymysql_connection is not None:
             self.pymysql_connection.close()

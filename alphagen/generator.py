@@ -3,7 +3,7 @@
 import os
 from typing import List
 
-from alphagen.generators.api_doc import ApiDocListGenerator, ApiDocDetailGenerator
+from alphagen.generators.api_doc import ApiDocListGenerator, ApiDocReadGenerator
 from config import DEFAULT_CONFIGS
 from generators.model_generator import ModelGenerator
 from generators.controller_generator import ControllerGenerator
@@ -23,9 +23,13 @@ class Generator:
         self.table_prefix = DEFAULT_CONFIGS["table_prefix"]
 
         self.force = False
+        self.site_id = 18
 
     def set_force(self, force):
         self.force = force
+
+    def set_site_id(self, site_id):
+        self.site_id = site_id
 
     def parse_path(self, path: str) -> tuple:
         """
@@ -93,17 +97,19 @@ class Generator:
             api_doc_list_generator.set_module_name(module_name)
             api_doc_list_generator.set_table_prefix(self.table_prefix)
             api_doc_list_generator.set_force(self.force)
+            api_doc_list_generator.set_site_id(self.site_id)
             api_doc_list_generator.generate()
 
-            api_doc_detail_generator = ApiDocDetailGenerator(
+            api_doc_read_generator = ApiDocReadGenerator(
                 class_name,
                 os.path.join(self.base_paths['api_doc'], module_name)
             )
-            api_doc_detail_generator.set_mysql_connection(**self.mysql_config)
-            api_doc_detail_generator.set_module_name(module_name)
-            api_doc_detail_generator.set_table_prefix(self.table_prefix)
-            api_doc_detail_generator.set_force(self.force)
-            api_doc_detail_generator.generate()
+            api_doc_read_generator.set_mysql_connection(**self.mysql_config)
+            api_doc_read_generator.set_module_name(module_name)
+            api_doc_read_generator.set_table_prefix(self.table_prefix)
+            api_doc_read_generator.set_force(self.force)
+            api_doc_read_generator.set_site_id(self.site_id)
+            api_doc_read_generator.generate()
 
             # 生成Bean
             # bean_generator = BeanGenerator(

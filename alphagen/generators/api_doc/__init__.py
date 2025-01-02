@@ -1,4 +1,4 @@
 from .list import ApiDocListGenerator
-from .detail import ApiDocDetailGenerator
+from .read import ApiDocReadGenerator
 
-__all__ = ['ApiDocListGenerator', 'ApiDocDetailGenerator']
+__all__ = ['ApiDocListGenerator', 'ApiDocReadGenerator']

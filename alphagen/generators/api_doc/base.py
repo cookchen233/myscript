@@ -51,6 +51,7 @@ class ApiDocBaseGenerator(BaseGenerator):
         display_name = f"{table_comment}{self.get_doc_type()}"
 
         return dict(
+            site_id=self.site_id,
             table_name=table_name,
             table_prefix=self.table_prefix,
             module_name=self.module_name,
