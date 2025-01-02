@@ -328,7 +328,7 @@ class NotificationServer:
         """
             
         current_time = time.time()
-        history_key = f"{data["program_name"]}_{data["message_type"]}_{data["message_tag"]}_{notify_type}"
+        history_key = f'{data["program_name"]}_{data["message_type"]}_{data["message_tag"]}_{notify_type}'
         
         if history_key in self.notification_history:
             last_time = self.notification_history[history_key]
@@ -350,15 +350,15 @@ class NotificationServer:
             sound_file = self.config['sound_file']
             if os.path.exists(sound_file):
                 if sys.platform == 'darwin':  # macOS
-                    self.logger.debug(f"Sound played: [{data["program_name"]}] [{data["message_type"]}]")
+                    self.logger.debug(f'Sound played: [{data["program_name"]}] [{data["message_type"]}]')
                     subprocess.run(['afplay', sound_file])
             else:
                 self.logger.warning(f"Sound file not found: {sound_file}")
                 
             # 播放语音消息
             if self.config['say_message'] and sys.platform == 'darwin':
-                self.logger.debug(f"Voice played: [{data["program_name"]}] [{data["message_type"]}] {data["title"][:10]}")
-                subprocess.run(['say', f"{data["title"][:10]}"])
+                self.logger.debug(f'Voice played: [{data["program_name"]}] [{data["message_type"]}] {data["title"][:10]}')
+                subprocess.run(['say', f'{data["title"][:10]}'])
                 
         except Exception as e:
             self.logger.error(f"Failed to play sound: {e}")
@@ -400,7 +400,7 @@ class NotificationServer:
                 smtp.login(self.config['smtp_user'], self.config['smtp_pass'])
                 smtp.send_message(msg)
                     
-            self.logger.debug(f"Mail sent: [{data["program_name"]}] [{data["message_type"]}]")
+            self.logger.debug(f'Mail sent: [{data["program_name"]}] [{data["message_type"]}]')
         except Exception as e:
             self.logger.error(f"Failed to send mail: {e}")
             
@@ -416,8 +416,8 @@ class NotificationServer:
                         await self.discord_start()
                     
                     if self.discord_channel:
-                        await self.discord_channel.send(f"[{data["program_name"]}] [{data["message_type"]}] {data["message_tag"]} {data["title"]}")
-                        self.logger.debug(f"Discord sent: [{data["program_name"]}] [{data["message_type"]}]")
+                        await self.discord_channel.send(f'[{data["program_name"]}] [{data["message_type"]}] {data["message_tag"]} {data["title"]}')
+                        self.logger.debug(f'Discord sent: [{data["program_name"]}] [{data["message_type"]}]')
                         return
                         
                 except discord.errors.HTTPException as e:
@@ -579,7 +579,7 @@ class NotificationServer:
                 
                 # 代理配置
                 if self.config['enable_proxy']:
-                    self.logger.info(f"Using proxy: {self.config['proxy_settings']}")
+                    self.logger.info(f'Using proxy: {self.config["proxy_settings"]}')
                     
                     # 根据代理类型选择连接器
                     if self.config['proxy_settings']['socks']:
@@ -588,7 +588,7 @@ class NotificationServer:
                             self.config['proxy_settings']['socks'],
                             ssl=False
                         )
-                        self.logger.info(f"Using SOCKS proxy: {self.config['proxy_settings']['socks']}")
+                        self.logger.info(f'Using SOCKS proxy: {self.config["proxy_settings"]["socks"]}')
                     else:
                         # HTTP/HTTPS代理
                         connector = aiohttp.TCPConnector(
@@ -678,7 +678,7 @@ class NotificationServer:
         except json.JSONDecodeError as e:
             return self.logger.info(f"json loads message 处理异常 {message}")
         
-        self.logger.info(f"Received message: [{data["program_name"]}] [{data["message_type"]}] {data["message_tag"]}\nTitle: {data["title"]}\n\nDetails: {data["details"]}")
+        self.logger.info(f'Received message: [{data["program_name"]}] [{data["message_type"]}] {data["message_tag"]}\nTitle: {data["title"]}\n\nDetails: {data["details"]}')
                     
         # 发送通知
         if self.should_notify(data, 'sound'):

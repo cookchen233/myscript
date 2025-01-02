@@ -226,8 +226,8 @@ class VueEditGenerator(BaseGenerator):
         page_name = camel_to_snake(self.file_name)
         if module_path:
             prefix = f"{module_path}_"
-            if page_name.startswith(prefix):
-                page_name = page_name[len(prefix):]
+            # if page_name.startswith(prefix):
+            #     page_name = page_name[len(prefix):]
 
         page_path = page_name.replace('_', '-')
 

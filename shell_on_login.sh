@@ -12,7 +12,7 @@
 # nohup ~/Coding/myscript/clipboard_to_ftp.sh 1 > /dev/null 2>&1 &
 
 # listen to a server to play error sound for receiving vitual ubuntu server
-nohup python ~/Coding/myscript/notification-server/main.py 1 >/dev/null 2>&1 &
+nohup python3 ~/Coding/myscript/notification-server/main.py 1 >/dev/null 2>&1 &
 
 # 自动推送仓库
-nohup python ~/Coding/myscript/auto-commit/main.py 1 >/dev/null 2>&1 &
+nohup python3 ~/Coding/myscript/auto-commit/main.py 1 >/dev/null 2>&1 &
