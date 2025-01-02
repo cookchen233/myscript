@@ -194,7 +194,7 @@ const handleBatchUpdate = async (updateData: any, message = '确定要批量更�
           {%- elif field.display_type == 'money' %}
           <span class="text-orange-500">¥{{ '{{ row.' + field.field + ' }}' }}</span>
           {%- elif field.display_type == 'image' %}
-          <file-label v-if="row.{{ field.field }}" :file-url="row.{{ field.field }}" />
+          <file-label v-if="row.{{ field.field }}" :file-url="row.{{ field.field }}" height="60px" />
           {%- elif field.display_type=='file' %}
           <file-label v-if="row.{{ field.field }}" :file-url="row.{{ field.field }}" height="60px" />
           {%- elif field.display_type == 'switch2' %}

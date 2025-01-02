@@ -12,7 +12,7 @@ class ApiDocCreateGenerator(ApiDocBaseGenerator):
         # 创建接口不需要的字段
         if field_name in self.non_param_fields:
             return False
-            
+
         # 自动生成或系统管理的字段不需要作为参数
         auto_generated_fields = {
             'id', 'create_time', 'update_time', 'deleted_time',
@@ -23,3 +23,15 @@ class ApiDocCreateGenerator(ApiDocBaseGenerator):
 
         # 大多数其他字段都应该作为创建参数
         return True
+
+    def generate(self):
+        import re
+        comment = self.get_table_comment(False)
+
+        # 使用正则表达式查找中括号内的内容
+        match = re.search(r'\[(.*?)\]', comment)
+
+        if match:
+            content = match.group(1)
+            if "c" in content:
+                super().generate()

@@ -12,7 +12,7 @@ class ApiDocUpdateGenerator(ApiDocBaseGenerator):
         # 更新接口不需要的字段
         if field_name in self.non_param_fields:
             return False
-            
+
         # 系统管理的时间字段不需要作为参数
         system_time_fields = {
             'create_time', 'update_time', 'deleted_time',
@@ -27,3 +27,15 @@ class ApiDocUpdateGenerator(ApiDocBaseGenerator):
 
         # 其他字段都可以作为可选的更新参数
         return True
+
+    def generate(self):
+        import re
+        comment = self.get_table_comment(False)
+
+        # 使用正则表达式查找中括号内的内容
+        match = re.search(r'\[(.*?)\]', comment)
+
+        if match:
+            content = match.group(1)
+            if "u" in content:
+                super().generate()

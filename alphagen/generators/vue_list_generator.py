@@ -170,7 +170,7 @@ class VueListGenerator(BaseGenerator):
             "module_name": self.module_name,
             "class_name": base_name,
             "table_name": table_name,
-            "table_comment": self._get_table_status(table_name, "Comment"),
+            "table_comment": self.get_table_comment(),
             "table_fields": table_fields,
             "search_fields": search_fields,
             "has_delete": has_delete,

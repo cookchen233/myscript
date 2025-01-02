@@ -20,7 +20,7 @@ curl 'https://api.13012345822.com/api/{{ module_name }}.{{ class_name }}/delete/
   "rid": "4143fy3ry8w8ucpe",
   "data": {
     {%- for property in properties %}
-    "{{ property.field_name }}": {% if property.property_type == "string" %}"{{ property.example_value }}"{% else %}{{ property.example_value }}{% endif %}{% if not loop.last %},{% endif %} //{{ property.field_comment or table_comment+property.field_name }}
+    "{{ property.field_name }}": {% if property.property_type == "string" %}"{{ property.example_value }}"{% else %}{{ property.example_value }}{% endif %}{% if not loop.last %},{% endif %} // {{ property.field_comment or table_comment+property.field_name }}
     {%- endfor %}
   },
   "ref": null

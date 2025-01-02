@@ -210,7 +210,7 @@ class VueEditGenerator(BaseGenerator):
             "module_name": self.module_name,
             "class_name": base_name,
             "table_name": table_name,
-            "table_comment": self._get_table_status(table_name, "Comment"),
+            "table_comment": self.get_table_comment(),
             "form_fields": form_fields,
             "has_area": has_area,
             "has_image": has_image,

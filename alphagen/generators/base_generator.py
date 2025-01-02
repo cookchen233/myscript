@@ -74,6 +74,21 @@ class BaseGenerator(object):
             print(f"数据库连接信息: {self.pymysql_connection.get_host_info()}")
             raise
 
+
+    def get_table_comment(self, clean=True):
+        # 获取中文表名（从表注释中提取）
+        import re
+        base_name = re.sub(r'Model|Controller|ApiController', '', self.file_name)
+        table_name = self.table_prefix + camel_to_snake(base_name)
+        table_comment = self._get_table_status(table_name, "Comment")
+        if not table_comment:
+            table_comment = table_name
+
+        # 移除表注释中可能的额外描述（通常在括号内）
+        if clean:
+            return self.clean_comment(table_comment)
+        return table_comment
+
     def clean_comment(self,comment):
         """
         Clean comment by removing enum-like descriptions in square brackets

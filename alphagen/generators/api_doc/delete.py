@@ -13,3 +13,16 @@ class ApiDocDeleteGenerator(ApiDocBaseGenerator):
         if field_name in self.non_param_fields:
             return False
         return field_name == 'id' or field_name.endswith('_id')
+
+    def generate(self):
+        import re
+        comment = self.get_table_comment(False)
+
+        # 使用正则表达式查找中括号内的内容
+        match = re.search(r'\[(.*?)\]', comment)
+
+        if match:
+            content = match.group(1)
+            if "d" in content:
+                super().generate()
+
