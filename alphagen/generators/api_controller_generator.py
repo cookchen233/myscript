@@ -10,6 +10,12 @@ class ApiControllerGenerator(BaseGenerator):
         self.module_name = ""
         self.table_prefix = ""
 
+    def generated_file_name(self):
+        return self.get_class_name()+".php"
+
+    def get_class_name(self):
+        return self.file_name.replace(snake_to_camel(self.module_name, True), "")
+
     def get_template_name(self):
         return "api_controller.jinja2"
 
@@ -21,7 +27,8 @@ class ApiControllerGenerator(BaseGenerator):
             table_name=table_name,
             table_prefix=self.table_prefix,
             module_name=self.module_name,
-            class_name=self.file_name,
+            class_name=self.get_class_name(),
+            model_name=self.file_name,
             model_variable_name="$" + snake_to_camel(camel_to_snake(self.file_name)),
             table_comment=self._get_table_status(table_name, "Comment"),
             properties=self._get_model_properties(table_name),
