@@ -126,14 +126,19 @@ class BaseGenerator(object):
 
             # 分割枚举项
             items = [item.strip() for item in enum_part.split(',')]
+
             for item in items:
                 if ':' in item:
-                    key, value = item.strip().split(':')
-                    enum_items.append({
-                        'key': key.strip(),
-                        'value': value.strip(),
-                        'constant_name': f'V{key.strip()}'
-                    })
+                    try:
+                        key, value = item.strip().split(':')
+                        enum_items.append({
+                            'key': key.strip(),
+                            'value': value.strip(),
+                            'constant_name': f'V{key.strip()}'
+                        })
+                    except Exception as e:
+                        print("枚举类型备注格式有误, 解析结果: ", items)
+                        raise e
         return enum_items
 
     def _get_enum_fields(self, table_name: str) -> list:

@@ -112,15 +112,12 @@ class VueListGenerator(BaseGenerator):
                 continue
 
             # 设置搜索类型
-            search_type = "text"
+            search_type = display_type
 
             if display_type == "datetime":
                 search_type = "daterange"
 
-            elif "_id" in field_name and "[id:" in comment:
-                search_type = "data-id"
-
-            if "_id" not in field_name:
+            if "_id" not in field_name and display_type == "text":
                 continue
 
             field_config = {
@@ -207,8 +204,8 @@ class VueListGenerator(BaseGenerator):
         page_name = camel_to_snake(self.file_name)
         if module_path:
             prefix = f"{module_path}_"
-            # if page_name.startswith(prefix):
-                # page_name = page_name[len(prefix):]
+            if page_name.startswith(prefix):
+                page_name = page_name[len(prefix):]
 
         page_path = page_name.replace('_', '-')
 

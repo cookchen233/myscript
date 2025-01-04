@@ -17,6 +17,8 @@ class ApiDocBaseGenerator(BaseGenerator):
             'deleted_time', 'create_time', 'update_time', 'preview_img',
             'imgs', 'files', 'attachments',
             'site_id',
+            'member_id',
+            'admin_id',
         }
 
         # 在返回结果中要排除的字段
