@@ -191,6 +191,14 @@ const handleBatchUpdate = async (updateData: any, message = '确定要批量更�
           <enum-label field="{{ field.field|snake_to_camel }}Options" :value="row.{{ field.field }}"/>
           {%- elif field.display_type == 'data-id' %}
           <enum-label field="{{ field.field[:-3]|snake_to_camel }}Options" :value="row.{{ field.field }}"/>
+          {%- elif field.field == 'member_id' %}
+              <div class="flex items-center gap-4">
+                  <el-avatar v-if="row.member?.headimg" :size="40" :src="row.member?.headimg" />
+                  <div class="flex flex-col gap-1">
+                      <div class="text-gray-900">{{ '{{row.member?.nickname || row.name}}' }}</div>
+                      <div class="text-gray-500 text-sm">{{ '{{row.member?.mobile || row.mobile}}' }}</div>
+                  </div>
+              </div>
           {%- elif field.display_type == 'money' %}
           <span class="text-orange-500">¥{{ '{{ row.' + field.field + ' }}' }}</span>
           {%- elif field.display_type == 'image' %}

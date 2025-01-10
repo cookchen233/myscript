@@ -30,14 +30,19 @@ class VueListGenerator(BaseGenerator):
             field_name = field["Field"].lower()
             display_type = self._get_field_display_type(field)
             base_type = self._get_field_base_type(field)
+            label = self.clean_comment(field["Comment"]) or field_name
+
             if field_name in exclude_fields:
                 continue
             if base_type == "longtext":
                 continue
+            if field_name == "member_id":
+                display_type = "member"
+                label = "会员"
 
             field_config = {
                 "field": field_name,
-                "label": self.clean_comment(field["Comment"]) or field_name,
+                "label": label,
                 "prop": snake_to_camel(field_name),
                 "display_type": display_type,
                 "base_type": base_type,
@@ -70,6 +75,10 @@ class VueListGenerator(BaseGenerator):
                     "width": 120,
                     "template": True,
                     "align": "center"
+                },
+                "member": {
+                    "width": 180,
+                    "template": True,
                 }
             }
 

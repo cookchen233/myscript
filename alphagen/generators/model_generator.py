@@ -70,9 +70,11 @@ class ModelGenerator(BaseGenerator):
                     if relation_name == "member":
                         relation_model = "\\app\\common\\model\\Member"
                         local_key = "member_id"
+                        continue
                     elif relation_name == "admin":
                         relation_model = "\\app\\common\\model\\AdminUser"
                         local_key = "admin_id"
+                        continue
                     else:
                         relation_model = snake_to_camel(relation_table, True) + "Model"
 
