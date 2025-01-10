@@ -66,10 +66,13 @@ class ModelGenerator(BaseGenerator):
                     relation_name = field_name.replace("_id", "")
 
                     # 构建关联配置
+                    local_key = "id"
                     if relation_name == "member":
                         relation_model = "\\app\\common\\model\\Member"
+                        local_key = "member_id"
                     elif relation_name == "admin":
                         relation_model = "\\app\\common\\model\\AdminUser"
+                        local_key = "admin_id"
                     else:
                         relation_model = snake_to_camel(relation_table, True) + "Model"
 
@@ -78,7 +81,7 @@ class ModelGenerator(BaseGenerator):
                         "type": "belongsTo",
                         "model": relation_model,
                         "foreign_key": field_name,
-                        "local_key": "id",
+                        "local_key": local_key,
                         "comment": f"关联{camel_to_snake(relation_table)}表"
                     }
                     relations.append(relation)

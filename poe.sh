@@ -14,8 +14,7 @@ tell application "System Events"
 
     -- 复制提示词
     set ori_clipboard_text to (the clipboard as text)
-    set outputText to "I want you to act as an English Teacher. I will provide some specific information about any questions, and you will give the answers to me and correct my questions with common expressions in English. Remember, 
-    before giving the answers, you must correct my grammar or recommend the common native English with every sentence(ignore case or punctuation error), remember, correct my sentence for every sentence. If my sentence does not need optimization, just respond with 'Correct!'.  So, My first request is: 
+    set outputText to "I want you to act as an English teacher. When I write a sentence, first respond with 'Better:' followed by the improved version(s), focusing only on word choice and structure (ignore capitalization and punctuation errors). If my sentence is already correct, respond with 'Correct!'. Then provide the answer to my question. My first sentence is: 
 "
     set the clipboard to {text:(outputText as string), Unicode text:outputText}
     -- 粘贴提示词
