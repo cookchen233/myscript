@@ -2,7 +2,7 @@
 ### {{ display_name }}
 curl 'https://api.13012345822.com/api/{{ module_name }}.{{ class_name }}/update/' \
   -H 'Content-Type: application/json'\
-  -H 'site-id: {{ site_id }}' \
+  -H 'site-id:' \
   -d '{
     {% for property in properties -%}
     {% if property.is_parameter %}

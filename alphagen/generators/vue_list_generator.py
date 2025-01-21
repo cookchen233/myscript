@@ -162,6 +162,7 @@ class VueListGenerator(BaseGenerator):
     def get_template_variables(self):
         base_name = self.file_name
         table_name = self.table_prefix + camel_to_snake(base_name)
+        alias_name = camel_to_snake(base_name)
 
         table_schema = self._get_table_schema(table_name)
         table_fields = self._get_table_fields(table_name)
@@ -176,6 +177,7 @@ class VueListGenerator(BaseGenerator):
             "module_name": self.module_name,
             "class_name": base_name,
             "table_name": table_name,
+            "alias_name": alias_name,
             "table_comment": self.get_table_comment(),
             "table_fields": table_fields,
             "search_fields": search_fields,

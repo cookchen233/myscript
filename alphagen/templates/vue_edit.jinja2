@@ -1,4 +1,33 @@
 <!-- src/pages/{{ module_name }}/{{ table_name|replace('_', '-')|replace('lc-'+module_name+'-', '') }}/edit.vue -->
+<template>
+    <enum-provider url="/common/options" :fields="[
+    'approvalStatusOptions',
+  {%- for field in form_fields %}
+  {%- if field.form_type == 'enum' %}
+    '{{ field.field|snake_to_camel }}Options',
+  {%- elif field.form_type == 'data-id' %}
+    '{{ field.field[:-3]|snake_to_camel }}Options',
+  {%- else %}
+  {%- endif %}
+  {%- endfor %}
+  ]">
+        <base-edit
+                v-model="formData"
+                :fields="formFields"
+                :rules="rules"
+                :title="isEdit ? '编辑{{ table_comment }}' : '添加{{ table_comment }}'"
+                :mode="props.mode"
+                :visible="props.visible"
+                @update:visible="$emit('update:visible', $event)"
+                @cancel="$emit('cancel')"
+                @success="$emit('success', $event)"
+                :id="currentId"
+                :api="API"
+                :on-success="handleSuccess"
+        />
+    </enum-provider>
+</template>
+
 <script lang="ts" setup>
 import {ref, reactive, onMounted, computed, PropType} from 'vue'
 import { useRouter, useRoute } from 'vue-router'
@@ -139,31 +168,3 @@ onMounted(async () => {
   }
 })
 </script>
-
-<template>
-    <enum-provider url="/common/options" :fields="[
-    'approvalStatusOptions',
-  {%- for field in form_fields %}
-  {%- if field.base_type == 'enum' %}
-    '{{ field.field|snake_to_camel }}Options',
-  {%- elif field.form_type == 'data-id' %}
-    '{{ field.field[:-3]|snake_to_camel }}Options',
-  {%- endif %}
-  {%- endfor %}
-  ]">
-    <base-edit
-      v-model="formData"
-      :fields="formFields"
-      :rules="rules"
-      :title="isEdit ? '编辑{{ table_comment }}' : '添加{{ table_comment }}'"
-      :mode="props.mode"
-      :visible="props.visible"
-      @update:visible="$emit('update:visible', $event)"
-      @cancel="$emit('cancel')"
-      @success="$emit('success', $event)"
-      :id="currentId"
-      :api="API"
-      :on-success="handleSuccess"
-    />
-  </enum-provider>
-</template>

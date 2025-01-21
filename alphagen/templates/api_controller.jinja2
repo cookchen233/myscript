@@ -15,19 +15,19 @@ class {{class_name}} extends CrudController
 {
     protected function initialize()
     {
-        $this->model = new {{model_name}}Model();
+        $this->model = new {{class_name}}Model();
         parent::initialize();
     }
 
-    public function create(): Json {
+    public function create() {
         return fail("该功能暂未实现");
     }
 
-    public function update(int $id): Json {
+    public function update($id) {
         return fail("该功能暂未实现");
     }
 
-    public function delete(int $id): Json {
+    public function delete($id) {
         return fail("该功能暂未实现");
     }
 }

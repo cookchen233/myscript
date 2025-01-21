@@ -2,15 +2,9 @@
 ### {{ display_name }}
 curl 'https://api.13012345822.com/api/{{ module_name }}.{{ class_name }}/read/' \
   -H 'Content-Type: application/json'\
-  -H 'site-id: {{ site_id }}' \
+  -H 'site-id:' \
   -d '{
-    {% for property in properties -%}
-    {% if property.is_parameter %}
-    "{{ property.field_name }}":{% if property.property_type == "string" %}"{{ property.example_value }}"{% else %}{{ property.example_value }}{% endif %},
-    "--{{ property.field_comment or table_comment+property.field_name }}":"",
-    {% endif %}
-    {%- endfor %}
-    "--":""
+    "id":1
   }'
 
 # 返回:

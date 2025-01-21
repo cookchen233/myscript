@@ -12,8 +12,19 @@ class ApiDocListGenerator(ApiDocBaseGenerator):
         # 列表接口的常见筛选参数
         common_list_params = {'status', 'type', 'category', 'level', 'is_enabled', 'is_deleted'}
 
+
+        # 常见的不作为参数的字段
+        self.non_filter_params = {
+            'content', 'detail', 'description', 'desc', 'remark',
+            'deleted_time', 'create_time', 'update_time', 'preview_img',
+            'imgs', 'files', 'attachments',
+            'site_id',
+            'member_id',
+            'admin_id',
+        }
+
         # 如果字段名在非参数列表中，直接返回False
-        if field_name in self.non_param_fields:
+        if field_name in self.non_filter_params:
             return False
 
         # 列表常用的筛选字段

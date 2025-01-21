@@ -8,25 +8,19 @@ class ApiDocUpdateGenerator(ApiDocBaseGenerator):
         return "更新"
 
     def _should_be_parameter(self, field_name, field_type, comment):
-        """判断字段是否应该作为更新API参数"""
-        # 更新接口不需要的字段
-        if field_name in self.non_param_fields:
-            return False
+            """判断字段是否应该作为创建API参数"""
+            # 更新接口不需要的字段
+            self.non_param_fields = {
+                'deleted_time', 'create_time', 'update_time',
+                'site_id',
+                'member_id',
+                'admin_id',
+            }
+            if field_name in self.non_param_fields:
+                return False
 
-        # 系统管理的时间字段不需要作为参数
-        system_time_fields = {
-            'create_time', 'update_time', 'deleted_time',
-            'created_at', 'updated_at', 'deleted_at'
-        }
-        if field_name in system_time_fields:
-            return False
-
-        # id字段是必需的参数
-        if field_name == 'id':
+            # 大多数其他字段都应该作为创建参数
             return True
-
-        # 其他字段都可以作为可选的更新参数
-        return True
 
     def generate(self):
         import re

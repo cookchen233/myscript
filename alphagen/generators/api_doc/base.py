@@ -11,14 +11,8 @@ class ApiDocBaseGenerator(BaseGenerator):
         self.module_name = ""
         self.table_prefix = ""
 
-        # 常见的不作为参数的字段
-        self.non_param_fields = {
-            'content', 'detail', 'description', 'desc', 'remark',
-            'deleted_time', 'create_time', 'update_time', 'preview_img',
-            'imgs', 'files', 'attachments',
-            'site_id',
-            'member_id',
-            'admin_id',
+        self.no_show_fields = {
+            "admin_id", "site_id", "delete_time",
         }
 
         # 在返回结果中要排除的字段
@@ -56,8 +50,10 @@ class ApiDocBaseGenerator(BaseGenerator):
         )
 
     def _should_be_parameter(self, field_name, field_type, comment):
-        """判断字段是否应该作为API参数 - 由子类实现"""
-        raise NotImplementedError
+            """判断字段是否应该作为创建API参数"""
+            if field_name in {"id"}:
+                return True
+            return False
 
     def _get_model_properties(self, table_schema):
         model_properties = []
@@ -71,13 +67,20 @@ class ApiDocBaseGenerator(BaseGenerator):
                 continue
 
             property_type = self._get_property_type(field_type)
-            example_value = self._get_example_value(field_name, field_type, property_type)
+            example_value = self._get_example_value(field, property_type)
+            if property_type != "number" and example_value != "":
+                example_value = '"' + example_value + '"'
+
+            if comment:
+                field_comment = comment.replace("[", "(").replace("]", ")").replace(":", "：").replace(",", "，")
+            else:
+                field_comment =  field_name
 
             model_property = dict(
                 name=snake_to_camel(field_name),
                 property_type=property_type,
                 field_name=field_name,
-                field_comment=comment,
+                field_comment=field_comment,
                 is_parameter=self._should_be_parameter(field_name, field_type, comment),
                 example_value=example_value,
                 set_method_name=snake_to_camel("set_" + field_name),
@@ -89,7 +92,7 @@ class ApiDocBaseGenerator(BaseGenerator):
     def _get_property_type(self, field_type):
         """获取属性类型"""
         if any(t in field_type.lower() for t in ['int', 'float', 'decimal', 'double', 'tinyint']):
-            return "int"
+            return "number"
         elif 'datetime' in field_type.lower() or 'timestamp' in field_type.lower():
             return "datetime"
         elif 'date' in field_type.lower():
@@ -99,8 +102,12 @@ class ApiDocBaseGenerator(BaseGenerator):
         else:
             return "string"
 
-    def _get_example_value(self, field_name, field_type, property_type):
+    def _get_example_value(self, field, property_type):
         """获取示例值"""
+
+        field_type = field["Type"]
+        field_name = field["Field"]
+        comment = field["Comment"]
         # 特殊字段名处理
         if field_name.endswith('_status'):
             return 1
@@ -120,7 +127,7 @@ class ApiDocBaseGenerator(BaseGenerator):
             return 20
 
         # 根据类型处理
-        if property_type == "int":
+        if property_type == "number":
             return 0
         elif property_type == "datetime":
             return "2024-01-01 00:00:00"
@@ -130,12 +137,8 @@ class ApiDocBaseGenerator(BaseGenerator):
             return "00:00:00"
         else:
             # 如果字段名包含name或title，返回更有意义的示例值
-            if 'name' in field_name or 'title' in field_name:
-                return "标题 ..."
-            elif 'keyword' in field_name:
+            if 'keyword' in field_name:
                 return "关键词"
-            elif 'remark' in field_name or 'desc' in field_name:
-                return "说明 ..."
             elif 'img' in field_name:
                 return "xx.png"
             else:
