@@ -28,9 +28,19 @@ class ModelGenerator(BaseGenerator):
             model_variable_name="$" + snake_to_camel(camel_to_snake(self.file_name)),
             table_comment=self._get_table_status(table_name, "Comment"),
             properties=self._get_model_properties(table_schema),
+            json_fields=self.get_json_fields(table_schema),
             relations=relations,
             datetime=datetime
         )
+
+    def get_json_fields(self, table_schema):
+        """获取JSON类型字段列表"""
+        json_fields = []
+        for field in table_schema:
+            field_comment = field["Comment"].upper()
+            if "[JSON]" in field_comment or field_comment.endswith("JSON"):
+                json_fields.append(field["Field"])
+        return json_fields
 
     def _get_model_properties(self, table_schema):
         model_properties = []

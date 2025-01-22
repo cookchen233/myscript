@@ -20,6 +20,13 @@ class {{class_name}} extends BaseModel
     protected $name = '{{ table_name|replace(table_prefix, "") }}';
 
     use SoftDelete;
+    {% if json_fields %}
+    protected $json = [
+    {%- for field in json_fields %}
+        '{{ field }}'{% if not loop.last %},{% endif %}
+    {%- endfor %}
+    ];
+    {% endif %}
 
     {%- for relation in relations %}
 

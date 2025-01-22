@@ -101,6 +101,9 @@ class BaseGenerator(object):
         bracket_start = comment.find('[')
         if bracket_start != -1:
             return comment[:bracket_start].strip()
+        bracket_start = comment.find('(')
+        if bracket_start != -1:
+            return comment[:bracket_start].strip()
 
         return comment.strip()
 

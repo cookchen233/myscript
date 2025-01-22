@@ -97,7 +97,7 @@ class VueEditGenerator(BaseGenerator):
                         # 解析 id:table 格式
                         id_part, table_part = bracket_content.split(":")
                         if id_part.strip() == "id":
-                            table_name = table_part.strip()
+                            option_name = snake_to_camel(table_part.strip())+"Options"
                             # 修改表单类型为 data-id
                             form_type = "data-id"
                             label = self.clean_comment(comment[:comment.index("[")]).strip()
@@ -109,7 +109,7 @@ class VueEditGenerator(BaseGenerator):
                                 "form_type": form_type,
                                 "base_type": base_type,
                                 "props": {
-                                    "field": f"{table_name}Options",
+                                    "field": f"{option_name}",
                                     "class": "w-[320px]",
                                     "placeholder": f"请选择{label}"
                                 }

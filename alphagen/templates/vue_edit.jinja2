@@ -119,7 +119,7 @@ const formFields = [
         {%- endif -%}
         {%- if field.form_type == 'area-selector' -%}startLevel: 2, endLevel: 4, parentCode: '440000000000', {%- endif -%}
         {%- if field.form_type == 'enum' -%}field: '{{ field.field|snake_to_camel }}Options', clearable: true, {%- endif -%}
-        {%- if field.form_type == 'data-id' -%}field: '{{ field.props.field }}', clearable: true, {%- endif -%}
+        {%- if field.form_type == 'data-id' -%}field: '{{ field.props.field|snake_to_camel }}', clearable: true, {%- endif -%}
         {%- if field.form_type == 'textarea' -%}rows: {{ field.rows|default(4) }}, maxlength: 500, showWordLimit: true, {%- endif -%}
         {%- if field.form_type == 'select-image' -%}
           type: '{{ field.props.type }}', {%- if field.props.multiple -%}multiple: true, limit: {{ field.props.limit|default(15) }}, {%- endif -%}

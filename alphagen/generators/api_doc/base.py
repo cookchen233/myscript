@@ -113,7 +113,7 @@ class ApiDocBaseGenerator(BaseGenerator):
             return 1
         elif field_name.endswith('_type'):
             return 1
-        elif field_name == 'id' or field_name.endswith('_id'):
+        elif field_name == 'id' or (field_name.endswith('_id') and property_type == "number"):
             return 1
         elif field_name in {'is_deleted', 'is_enabled', 'is_visible', 'is_active'}:
             return 0
