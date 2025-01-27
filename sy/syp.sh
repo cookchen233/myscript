@@ -14,6 +14,8 @@
 export LC_ALL=C
 export LANG=C
 
+unset http_proxy https_proxy all_proxy
+
 # 创建临时目录用于缓存
 # 获取项目根目录的唯一标识(使用目录路径的哈希值)
 PROJECT_HASH=$((pwd | md5) || (pwd | md5sum) | cut -d' ' -f1)

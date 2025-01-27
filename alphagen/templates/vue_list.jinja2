@@ -6,7 +6,7 @@
   {%- if field.display_type == 'enum' %}
     '{{ field.field|snake_to_camel }}Options',
   {%- elif field.display_type == 'data-id' %}
-    '{{ field.field[:-3]|snake_to_camel }}Options',
+    '{{ field.data_id_props.options_name|snake_to_camel }}Options',
   {%- endif %}
   {%- endfor %}
   ]">
@@ -19,6 +19,7 @@
                 ref="baseListRef"
                 title="{{ table_comment }}"
                 :can-delete-="false"
+                :can-edit-="false"
                 :can-add-="false"
                 :selectable-="true"
                 :opts-="[
@@ -41,7 +42,7 @@
                             {%- if field.search_type == 'enum' %}
                                 <enum-selector v-model="query.{{ field.field }}" field="{{ field.field|snake_to_camel }}Options" class="w-[{{ field.width|default(200) }}px]" clearable :filterable="true" />
                             {%- elif field.search_type == 'data-id' %}
-                                <enum-selector v-model="query.{{ field.field }}" field="{{ field.field[:-3]|snake_to_camel }}Options" class="w-[{{ field.width|default(200) }}px]" clearable :filterable="true" />
+                                <enum-selector v-model="query.{{ field.field }}" field="{{ field.data_id_props.options_name|snake_to_camel }}Options" class="w-[{{ field.width|default(200) }}px]" clearable :filterable="true" />
                             {%- elif field.search_type == 'daterange' %}
                                 <el-date-picker v-model="query.{{ field.field }}_range" type="daterange" range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期" value-format="YYYY-MM-DD" class="w-[360px]" clearable />
                             {%- elif field.search_type == 'numberrange' %}
@@ -68,7 +69,7 @@
                             {%- if field.display_type == 'enum' %}
                                 <enum-label field="{{ field.field|snake_to_camel }}Options" :value="row.{{ field.field }}"/>
                             {%- elif field.display_type == 'data-id' %}
-                                <enum-label field="{{ field.field[:-3]|snake_to_camel }}Options" :value="row.{{ field.field }}"/>
+                                <enum-label field="{{ field.data_id_props.options_name|snake_to_camel }}Options" :value="row.{{ field.field }}"/>
                             {%- elif field.field == 'member_id' %}
                                 <div class="flex items-center gap-4">
                                     <el-avatar v-if="row.member?.headimg" :size="40" :src="row.member?.headimg" />
@@ -226,3 +227,4 @@ const handleBatchUpdate = async (updateData: any, message = '确定要批量更�
 }
 
 </script>
+{{ '' }}

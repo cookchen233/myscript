@@ -12,7 +12,10 @@ class ApiDocBaseGenerator(BaseGenerator):
         self.table_prefix = ""
 
         self.no_show_fields = {
-            "admin_id", "site_id", "delete_time",
+            "admin_id",
+            "site_id",
+            "delete_time",
+            "update_time",
         }
 
         # 在返回结果中要排除的字段

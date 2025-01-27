@@ -47,37 +47,11 @@ class VueEditGenerator(BaseGenerator):
 
         return "text"
 
-    def _get_data_id_fields(self, table_name):
-        table_schema = self._get_table_schema(table_name)
-        data_id_fields = []
-
-        for field in table_schema:
-            field_name = field["Field"].lower()
-            field_type = self._get_field_base_type(field)
-            comment = field["Comment"]
-            if field_type == "number" and "[" in comment and "]" in comment:
-                try:
-                    bracket_content = comment[comment.index("[")+1:comment.index("]")].strip()
-                    if ":" in bracket_content:
-                        id_part, table_part = bracket_content.split(":")
-                        if id_part.strip() == "id":
-                            table_part = table_part.strip()
-                            data_id_fields.append({
-                                "field": field_name,
-                                "table_name": table_part,
-                                "options_name": f"{table_part}Options",
-                                "url": f"/api/{table_part}/list"  # API路径可以根据实际情况调整
-                            })
-                except:
-                    print("get data_id_fields failed")
-
-        return data_id_fields
-
     def _get_form_fields(self, table_name):
         table_schema = self._get_table_schema(table_name)
         form_fields = []
 
-        exclude_fields = ['id', 'site_id', 'create_time', 'update_time', 'delete_time']
+        exclude_fields = ['id', 'site_id', 'create_time', 'update_time', 'delete_time', 'admin_id']
 
         for field in table_schema:
             if field["Field"] in exclude_fields:
@@ -97,7 +71,7 @@ class VueEditGenerator(BaseGenerator):
                         # 解析 id:table 格式
                         id_part, table_part = bracket_content.split(":")
                         if id_part.strip() == "id":
-                            option_name = snake_to_camel(table_part.strip())+"Options"
+                            option_name = snake_to_camel(table_part.strip())
                             # 修改表单类型为 data-id
                             form_type = "data-id"
                             label = self.clean_comment(comment[:comment.index("[")]).strip()

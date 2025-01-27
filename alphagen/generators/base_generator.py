@@ -178,6 +178,38 @@ class BaseGenerator(object):
 
         return enum_fields
 
+    def _get_data_id_fields(self, table_name):
+        table_schema = self._get_table_schema(table_name)
+        data_id_fields = []
+
+        for field in table_schema:
+            f= self._get_data_id_field(field)
+            if f:
+                data_id_fields.append(f)
+
+        return data_id_fields
+
+    def _get_data_id_field(self, field):
+        field_name = field["Field"].lower()
+        field_type = self._get_field_base_type(field)
+        comment = field["Comment"]
+        if field_type == "number" and "[" in comment and "]" in comment:
+            try:
+                bracket_content = comment[comment.index("[")+1:comment.index("]")].strip()
+                if ":" in bracket_content:
+                    id_part, table_part = bracket_content.split(":")
+                    if id_part.strip() == "id":
+                        table_part = table_part.strip()
+                        return {
+                            "field": field_name,
+                            "table_name": table_part,
+                            "options_name": f"{table_part}",
+                            "url": f"/api/{table_part}/list"  # API路径可以根据实际情况调整
+                        }
+            except:
+                print("get data_id_fields failed")
+        return None
+
     def _get_field_base_type(self, field):
         """
         获取字段的基础数据类型(number,string,longtext,date,time,datetime)

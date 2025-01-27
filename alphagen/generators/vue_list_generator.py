@@ -22,7 +22,9 @@ class VueListGenerator(BaseGenerator):
         # 不需要展示的字段
         exclude_fields = [
             'id',
-            'site_id','create_time','update_time', 'delete_time',
+            'site_id',
+            'admin_id',
+            'create_time','update_time', 'delete_time',
             'imgs', 'images', 'description', 'url', 'content', 'remark'
         ]
 
@@ -43,6 +45,7 @@ class VueListGenerator(BaseGenerator):
             field_config = {
                 "field": field_name,
                 "label": label,
+                'data_id_props': self._get_data_id_field(field),
                 "prop": snake_to_camel(field_name),
                 "display_type": display_type,
                 "base_type": base_type,
@@ -110,6 +113,7 @@ class VueListGenerator(BaseGenerator):
             exclude_fields = [
                 'id', 'site_id',
                 'member_id',
+                'admin_id',
                 'create_time',
                 'update_time', 'delete_time',
                 'preview_img', 'preview_image', 'main_image', 'imgs', 'images', 'description', 'url', 'content', 'remark'
@@ -131,6 +135,7 @@ class VueListGenerator(BaseGenerator):
 
             field_config = {
                 "field": field_name,
+                'data_id_props': self._get_data_id_field(field),
                 "label": self.clean_comment(comment) or field_name,
                 "search_type": search_type
             }

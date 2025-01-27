@@ -14,6 +14,8 @@ use think\model\concern\SoftDelete;
  * <!-- BEGIN PROPERTIES -->{% for property in properties %}
  * @property {{property.property_type}} ${{property.field_name}} {{property.field_comment}}{% endfor %}
  * <!-- END PROPERTIES -->
+{%- for relation in relations %}
+ * @property {{relation.model}} ${{relation.name|snake_to_camel}} {{relation.comment}}{% endfor %}
 */
 class {{class_name}} extends BaseModel
 {
@@ -44,3 +46,4 @@ class {{class_name}} extends BaseModel
     }
     {%- endfor %}
 }
+{{ '' }}
