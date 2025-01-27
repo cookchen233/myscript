@@ -194,21 +194,22 @@ class BaseGenerator(object):
         field_type = self._get_field_base_type(field)
         comment = field["Comment"]
         if field_type == "number" and "[" in comment and "]" in comment:
-            try:
-                bracket_content = comment[comment.index("[")+1:comment.index("]")].strip()
-                if ":" in bracket_content:
-                    id_part, table_part = bracket_content.split(":")
-                    if id_part.strip() == "id":
-                        table_part = table_part.strip()
-                        return {
-                            "field": field_name,
-                            "table_name": table_part,
-                            "options_name": f"{table_part}",
-                            "url": f"/api/{table_part}/list"  # API路径可以根据实际情况调整
-                        }
-            except:
-                print("get data_id_fields failed")
-        return None
+            bracket_content = comment[comment.index("[")+1:comment.index("]")].strip()
+            if ":" in bracket_content:
+                b= bracket_content.split(":")
+                if len(b)!=2:
+                    return None
+            id_part, table_part = b[0], b[1]
+            if id_part.strip() == "id":
+                table_part = table_part.strip()
+                return {
+                    "field": field_name,
+                    "table_name": table_part,
+                    "options_name": f"{table_part}",
+                    "url": f"/api/{table_part}/list"  # API路径可以根据实际情况调整
+                }
+        return None;
+
 
     def _get_field_base_type(self, field):
         """

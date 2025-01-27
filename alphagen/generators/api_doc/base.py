@@ -20,7 +20,10 @@ class ApiDocBaseGenerator(BaseGenerator):
 
         # 在返回结果中要排除的字段
         self.exclude_response_fields = {
-            'site_id', 'delete_time'
+            "admin_id",
+            "site_id",
+            "delete_time",
+            "update_time",
         }
 
     def generated_file_name(self):
