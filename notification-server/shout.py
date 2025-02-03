@@ -29,14 +29,14 @@ def play_audio(output_file):
             else:
                 subprocess.Popen(['aplay', output_file])
 
-def text_to_speech(text, 
-                   output_file="output.wav",
-                   speaker_id="p227",
-                   speed=1.0,
-                   pitch=1.3,
-                   noise_scale=0.8,
-                   noise_scale_w=1.0,
-                   emotion="happy",
+def text_to_speech(text,
+                   output_file="output.wav", 
+                   speaker_id="p243",  # 可以尝试不同说话人
+                   speed=1.1,          # 略微提高速度
+                   pitch=1.7,          # 提高音调使声音更尖锐
+                   noise_scale=0.3,    # 降低噪声使声音更清晰
+                   noise_scale_w=0.4,  # 降低噪声变化
+                   emotion="angry",    # 愤怒情绪本身声音较为尖锐
                    style="seductive",
                    autoplay=True,
                    blocking=False):
