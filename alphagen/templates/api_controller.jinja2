@@ -7,6 +7,8 @@ use app\api\controller\CrudController;{% endif %}
 
 use app\common\model{% if module_name %}\{{ module_name }}{% endif %}\{{class_name}}Model;
 use think\response\Json;
+use think\db\Query;
+use think\Paginator;
 
 /**
  * {{table_comment}}
@@ -17,6 +19,28 @@ class {{class_name}} extends CrudController
     {
         $this->model = new {{class_name}}Model();
         parent::initialize();
+    }
+
+    /**
+    * 应用自定义查询条件
+    */
+    protected function applyListQueryConditions(Query $query): static
+    {
+        return $this;
+    }
+
+    /**
+    * 处理列表结果
+    */
+    protected function processListResult(Paginator $dataset): void
+    {
+    }
+
+    /**
+    * 处理详情结果
+    */
+    protected function processReadResult(&$data): void
+    {
     }
 
     public function create() {

@@ -19,6 +19,7 @@ from watchdog.events import FileSystemEventHandler
 import aiohttp
 import asyncio
 from aiohttp_socks import ProxyConnector
+from shout import text_to_speech
 
 # 加载环境变量
 load_dotenv()
@@ -349,17 +350,22 @@ class NotificationServer:
             # 播放声音文件
             sound_file = self.config['sound_file']
             if os.path.exists(sound_file):
-                if sys.platform == 'darwin':  # macOS
-                    self.logger.debug(f'Sound played: [{data["program_name"]}] [{data["message_type"]}]')
-                    subprocess.run(['afplay', sound_file])
+                self.logger.debug(f'Sound played: [{data["program_name"]}] [{data["message_type"]}]')
+                # 使用 1.5 倍速播放最后一小段
+                duration = subprocess.check_output(['afinfo', sound_file]).decode()
+                total_duration = float(duration.split('duration:')[1].split('sec')[0].strip())
+                normal_duration = total_duration * 0.8
+                subprocess.run(['afplay', sound_file, '-t', str(normal_duration)])
+                subprocess.run(['afplay', '-r', '1.5', sound_file, '-t', str(total_duration - normal_duration), '-o', str(normal_duration)])
+                # subprocess.Popen(['afplay', sound_file])  # 不阻塞
             else:
                 self.logger.warning(f"Sound file not found: {sound_file}")
-                
+
             # 播放语音消息
             if self.config['say_message'] and sys.platform == 'darwin':
+                text_to_speech(f'{data["title"][:60]}', blocking=False)
                 self.logger.debug(f'Voice played: [{data["program_name"]}] [{data["message_type"]}] {data["title"][:10]}')
-                subprocess.run(['say', f'{data["title"][:10]}'])
-                
+                # subprocess.run(['say', f'{data["title"][:10]}'])     
         except Exception as e:
             self.logger.error(f"Failed to play sound: {e}")
 

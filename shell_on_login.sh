@@ -18,5 +18,8 @@ nohup python3 ~/Coding/myscript/notification-server/main.py 1 >/dev/null 2>&1 &
 nohup python3 ~/Coding/myscript/auto-commit/main.py 1 >/dev/null 2>&1 &
 
 # 内网穿透
-nohup ~/Coding/frp/frpc -c ~/Coding/frp/frpc.toml > ~/Coding/frp/output.log 2>&1 &
+# nohup ~/Coding/frp/frpc -c ~/Coding/frp/frpc.toml > ~/Coding/frp/output.log 2>&1 &
+
+# 声音播报
+nohup python3 ~/Coding/myscript/shout_server_block.py > /tmp/shout_service.log 2>&1 &
 
