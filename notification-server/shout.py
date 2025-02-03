@@ -29,10 +29,29 @@ def play_audio(output_file):
             else:
                 subprocess.Popen(['aplay', output_file])
 
+def clean_text(text):
+    # 定义要替换为空格的特殊字符
+    special_chars = [
+        '\\', '/', '::', '->', '=>', '<=>', '<-', '<', '>', 
+        '{', '}', '[', ']', '|', '&&', '||', '^', '$', '#',
+        '!=', '==', '===', '!==', '+=', '-=', '*=', '/=',
+        '++', '--', '**', '//', '/*', '*/', '@', '&',
+        ';', '`', '_'
+    ]
+    
+    cleaned_text = text
+    for char in special_chars:
+        cleaned_text = cleaned_text.replace(char, ' ')
+    
+    # 移除多余的空格
+    cleaned_text = ' '.join(cleaned_text.split())
+    
+    return cleaned_text
+    
 def text_to_speech(text,
                    output_file="output.wav", 
                    speaker_id="p243",  # 可以尝试不同说话人
-                   speed=1.1,          # 略微提高速度
+                   speed=1.2,          # 略微提高速度
                    pitch=1.7,          # 提高音调使声音更尖锐
                    noise_scale=0.3,    # 降低噪声使声音更清晰
                    noise_scale_w=0.4,  # 降低噪声变化
@@ -44,8 +63,9 @@ def text_to_speech(text,
     将文本转换为语音
     """
     def generate():
+        cleaned_text = clean_text(text)
         _tts.tts_to_file(
-            text=text,
+            text=cleaned_text,
             speaker=speaker_id,
             file_path=output_file,
             emotion=emotion,

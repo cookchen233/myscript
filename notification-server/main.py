@@ -363,7 +363,7 @@ class NotificationServer:
 
             # 播放语音消息
             if self.config['say_message'] and sys.platform == 'darwin':
-                text_to_speech(f'{data["title"][:60]}', blocking=False)
+                text_to_speech(f'{data["title"][:80]}', blocking=False)
                 self.logger.debug(f'Voice played: [{data["program_name"]}] [{data["message_type"]}] {data["title"][:10]}')
                 # subprocess.run(['say', f'{data["title"][:10]}'])     
         except Exception as e:

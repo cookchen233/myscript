@@ -50,6 +50,25 @@ class ShoutServer:
         if sys.platform == "darwin":
             process = subprocess.Popen(['afplay', output_file])
             process.wait()  # 等待播放完成
+    
+    def clean_text(self, text):
+        # 定义要替换为空格的特殊字符
+        special_chars = [
+            '\\', '/', '::', '->', '=>', '<=>', '<-', '<', '>', 
+            '{', '}', '[', ']', '|', '&&', '||', '^', '$', '#',
+            '!=', '==', '===', '!==', '+=', '-=', '*=', '/=',
+            '++', '--', '**', '//', '/*', '*/', '@', '&',
+            ';', '`', '_'
+        ]
+        
+        cleaned_text = text
+        for char in special_chars:
+            cleaned_text = cleaned_text.replace(char, ' ')
+        
+        # 移除多余的空格
+        cleaned_text = ' '.join(cleaned_text.split())
+        
+        return cleaned_text
 
     def text_to_speech(
             self, 
@@ -65,8 +84,9 @@ class ShoutServer:
             style="seductive"
             ):
         with self.play_lock:
+            cleaned_text = self.clean_text(text)
             self.tts.tts_to_file(
-                text=text,
+                text=cleaned_text,
                 speaker=speaker_id,
                 file_path=output_file,
                 emotion=emotion,
