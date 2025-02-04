@@ -45,5 +45,16 @@ class {{class_name}} extends BaseModel
         );
     }
     {%- endfor %}
+
+    {%- for field in enum_fields %}
+    /**
+    * {{ field.clean_comment }}的文本
+    */
+    public function get{{ field.field_name|snake_to_camel(True) }}LabelAttr($val, $data)
+    {
+        return \app\common\enum\{{ module_name }}\{{ field.field_name|snake_to_camel(True) }}::fromInt($data['{{ field.name }}'] ?? 0)->getLabel();
+    }
+    {%- endfor %}
+
 }
 {{ '' }}

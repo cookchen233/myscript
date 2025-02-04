@@ -29,6 +29,7 @@ class ModelGenerator(BaseGenerator):
             table_comment=self._get_table_status(table_name, "Comment"),
             properties=self._get_model_properties(table_schema),
             json_fields=self.get_json_fields(table_schema),
+            enum_fields=self._get_enum_fields(table_name),
             relations=relations,
             datetime=datetime
         )

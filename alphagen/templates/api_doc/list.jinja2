@@ -29,7 +29,10 @@ curl 'https://api.13012345822.com/api/{{ module_name }}.{{ class_name }}/list/' 
     "data": [
       {
         {%- for property in properties %}
-        "{{ property.field_name }}": {% if property.property_type == "string" %}"{{ property.example_value }}"{% else %}{{ property.example_value }}{% endif %}{% if not loop.last %},{% endif %} // {{ property.field_comment or table_comment+property.field_name }}
+        "{{ property.field_name }}": {% if property.property_type == "string" %}"{{ property.example_value }}"{% elif property.property_type == "json" %}{{ property.example_value|replace('"', '')|replace("'", "") }}{% else %}{{ property.example_value }}{% endif %}{% if not loop.last or enum_fields|length >0 %},{% endif %} // {{ property.field_comment or table_comment+property.field_name }}
+        {%- endfor %}
+        {%- for field in enum_fields %}
+        "{{ field.field_name }}_label": ""{% if not loop.last %},{% endif %} // {{ field.clean_comment or table_comment+field.field_name }}的文本
         {%- endfor %}
       }
     ]

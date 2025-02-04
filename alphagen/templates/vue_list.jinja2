@@ -46,7 +46,7 @@
                             {%- elif field.search_type == 'daterange' %}
                                 <el-date-picker v-model="query.{{ field.field }}_range" type="daterange" range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期" value-format="YYYY-MM-DD" class="w-[360px]" clearable />
                             {%- elif field.search_type == 'numberrange' %}
-                                <el-input-number-range v-model="{{ field.field }}Range" @change="handle{{ field.field|snake_to_camel(True) }}RangeChange" class="w-[260px]" {% if field.min is defined %}:min="{{ field.min }}"{% endif %} {% if field.precision is defined %}:precision="{{ field.precision }}"{% endif %} clearable />
+                                <el-input-number-range v-model="{{ field.field }}_range" @change="handle{{ field.field|snake_to_camel(True) }}RangeChange" class="w-[260px]" {% if field.min is defined %}:min="{{ field.min }}"{% endif %} {% if field.precision is defined %}:precision="{{ field.precision }}"{% endif %} clearable />
                             {%- elif field.search_type == 'switch' %}
                                 <el-select v-model="query.{{ field.field }}" class="w-[100px]" clearable placeholder="请选择"><el-option :value="1" label="开启" /><el-option :value="0" label="关闭" /></el-select>
                             {%- else %}

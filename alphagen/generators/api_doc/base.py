@@ -51,6 +51,7 @@ class ApiDocBaseGenerator(BaseGenerator):
             model_variable_name="$" + snake_to_camel(camel_to_snake(self.file_name)),
             table_comment=table_comment,
             properties=self._get_model_properties(table_schema),
+            enum_fields=self._get_enum_fields(table_name),
             relations=relations,
             datetime=datetime
         )
@@ -72,13 +73,13 @@ class ApiDocBaseGenerator(BaseGenerator):
             if field_name in self.exclude_response_fields:
                 continue
 
-            property_type = self._get_property_type(field_type)
+            property_type = self._get_property_type(field)
             example_value = self._get_example_value(field, property_type)
             if property_type != "number" and example_value != "":
                 example_value = '"' + example_value + '"'
 
             if comment:
-                field_comment = comment.replace("[", "(").replace("]", ")").replace(":", "：").replace(",", "，")
+                field_comment = comment.replace("[", "(").replace("]", ")").replace(":", "：").replace(",", "，").replace("(json)", "(数组)")
             else:
                 field_comment =  field_name
 
@@ -95,15 +96,17 @@ class ApiDocBaseGenerator(BaseGenerator):
             model_properties.append(model_property)
         return model_properties
 
-    def _get_property_type(self, field_type):
+    def _get_property_type(self,  field):
         """获取属性类型"""
-        if any(t in field_type.lower() for t in ['int', 'float', 'decimal', 'double', 'tinyint']):
+        if field["Comment"].endswith('[json]'):
+            return "json"
+        if any(t in  field["Type"].lower() for t in ['int', 'float', 'decimal', 'double', 'tinyint']):
             return "number"
-        elif 'datetime' in field_type.lower() or 'timestamp' in field_type.lower():
+        elif 'datetime' in  field["Type"].lower() or 'timestamp' in  field["Type"].lower():
             return "datetime"
-        elif 'date' in field_type.lower():
+        elif 'date' in  field["Type"].lower():
             return "date"
-        elif 'time' in field_type.lower():
+        elif 'time' in  field["Type"].lower():
             return "time"
         else:
             return "string"
@@ -115,6 +118,8 @@ class ApiDocBaseGenerator(BaseGenerator):
         field_name = field["Field"]
         comment = field["Comment"]
         # 特殊字段名处理
+        if comment.endswith('[json]'):
+            return '[]'
         if field_name.endswith('_status'):
             return 1
         elif field_name.endswith('_type'):

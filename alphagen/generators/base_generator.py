@@ -172,6 +172,7 @@ class BaseGenerator(object):
                     enum_field = {
                         'field_name': field['Field'],
                         'comment': field['Comment'],
+                        'clean_comment': self.clean_comment(field['Comment']),
                         'enum_items': enum_items
                     }
                     enum_fields.append(enum_field)
