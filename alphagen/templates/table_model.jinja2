@@ -4,34 +4,45 @@ namespace app\common\model{% if module_name %}\{{ module_name }}{% endif %};
 {% if module_name %}
 use app\common\model\BaseModel;{% endif %}
 use think\model\concern\SoftDelete;
-
+{%- for field in enum_fields %}
+use app\common\enum\{{ module_name }}\{{ field.field_name|snake_to_camel(True) }};
+{%- endfor %}
 /**
  * 表描述: {{table_comment}}
  * 表名: {{table_name}}
  * @generated {{ datetime.now().strftime('%Y-%m-%d %H:%M:%S') }}
  * @updated {{ datetime.now().strftime('%Y-%m-%d %H:%M:%S') }}
  *
- * <!-- BEGIN PROPERTIES -->{% for property in properties %}
- * @property {{property.property_type}} ${{property.field_name}} {{property.field_comment}}{% endfor %}
+ * <!-- BEGIN PROPERTIES -->
+{%- for property in properties %}
+ * @property {{property.property_type}} ${{property.field_name}} {{property.field_comment}}
+{%- endfor %}
  * <!-- END PROPERTIES -->
 {%- for relation in relations %}
- * @property {{relation.model}} ${{relation.name|snake_to_camel}} {{relation.comment}}{% endfor %}
+ * @property {{relation.model}} ${{relation.name|snake_to_camel}} {{relation.comment}}
+{%- endfor %}
 */
 class {{class_name}} extends BaseModel
 {
     protected $name = '{{ table_name|replace(table_prefix, "") }}';
 
     use SoftDelete;
+
     {% if json_fields %}
     protected $json = [
     {%- for field in json_fields %}
         '{{ field }}'{% if not loop.last %},{% endif %}
     {%- endfor %}
     ];
-    {% endif %}
+    {%- endif %}
 
-    {%- for relation in relations %}
+    protected $append =[
+    {%- for field in enum_fields %}
+        '{{ field.field_name }}_label',
+    {%- endfor %}
+    ];
 
+    {% for relation in relations %}
     /**
      * {{ relation.comment }}
      * @return \think\model\relation\{{ relation.type }}
@@ -44,17 +55,17 @@ class {{class_name}} extends BaseModel
             '{{ relation.local_key }}',// 关联表主键
         );
     }
-    {%- endfor %}
+    {% endfor %}
 
-    {%- for field in enum_fields %}
+    {% for field in enum_fields %}
     /**
     * {{ field.clean_comment }}的文本
     */
     public function get{{ field.field_name|snake_to_camel(True) }}LabelAttr($val, $data)
     {
-        return \app\common\enum\{{ module_name }}\{{ field.field_name|snake_to_camel(True) }}::fromInt($data['{{ field.name }}'] ?? 0)->getLabel();
+        return {{ field.field_name|snake_to_camel(True) }}::fromInt($data['{{ field.field_name }}'] ?? 0)->getLabel();
     }
-    {%- endfor %}
+    {% endfor %}
 
 }
 {{ '' }}

@@ -74,8 +74,8 @@
                                 <div class="flex items-center gap-4">
                                     <el-avatar v-if="row.member?.headimg" :size="40" :src="row.member?.headimg" />
                                     <div class="flex flex-col gap-1">
-                                        <div class="text-gray-900">{{ '{{row.member?.nickname || row.name}}' }}</div>
-                                        <div class="text-gray-500 text-sm">{{ '{{row.member?.mobile || row.mobile}}' }}</div>
+                                        <div class="text-gray-900">{{ '{{row.member?.nickname || row.member?.name}}' }}</div>
+                                        <div class="text-gray-500 text-sm">{{ '{{row.member?.mobile || row.member?.member_id}}' }}</div>
                                     </div>
                                 </div>
                             {%- elif field.display_type == 'money' %}
