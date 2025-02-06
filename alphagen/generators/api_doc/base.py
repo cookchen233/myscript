@@ -117,25 +117,23 @@ class ApiDocBaseGenerator(BaseGenerator):
         field_type = field["Type"]
         field_name = field["Field"]
         comment = field["Comment"]
-        # 特殊字段名处理
-        if comment.endswith('[json]'):
-            return '[]'
-        if field_name.endswith('_status'):
-            return 1
-        elif field_name.endswith('_type'):
+
+        if '_img' in field_name or '_image' in field_name:
+            return "https://xx.png"
+        elif 'imgs' in field_name or 'images' in field_name:
+            return ["https://xx.png", "https://xx2.png"]
+        elif comment.endswith('[json]'):
+            return '["something", "something2"]'
+        elif property_type == "number" and comment.endswith(']'):
             return 1
         elif field_name == 'id' or (field_name.endswith('_id') and property_type == "number"):
             return 1
-        elif field_name in {'is_deleted', 'is_enabled', 'is_visible', 'is_active'}:
+        elif field_name.startswith('_is'):
             return 0
         elif 'phone' in field_name:
             return "13800138000"
         elif 'email' in field_name:
             return "example@example.com"
-        elif field_name == 'page':
-            return 1
-        elif field_name == 'page_size':
-            return 20
 
         # 根据类型处理
         if property_type == "number":
@@ -147,13 +145,7 @@ class ApiDocBaseGenerator(BaseGenerator):
         elif property_type == "time":
             return "00:00:00"
         else:
-            # 如果字段名包含name或title，返回更有意义的示例值
-            if 'keyword' in field_name:
-                return "关键词"
-            elif 'img' in field_name:
-                return "xx.png"
-            else:
-                return ""
+            return f"test {field_name}"
 
     def _get_model_relations(self, table_schema):
         """获取模型关联关系"""

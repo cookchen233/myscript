@@ -5,7 +5,7 @@ curl 'https://api.13012345822.com/api/{{ module_name }}.{{ class_name }}/create/
   -d '{
     {% for property in properties -%}
     {% if property.is_parameter %}
-    "{{ property.field_name }}":{% if property.property_type == "string" %}"{{ property.example_value }}"{% elif property.property_type == "json" %}{{ property.example_value|replace('"', '')|replace("'", "") }}{% else %}{{ property.example_value }}{% endif %},
+    "{{ property.field_name }}": {% if property.property_type == "string" and property.example_value == "" %}"{{ property.example_value }}"{% elif property.property_type == "json" %}{{ property.example_value|replace('"', '')|replace("'", "") }}{% else %}{{ property.example_value }}{% endif %},
     "--{{ property.field_comment or table_comment+property.field_name }}":"",
     {% endif %}
     {%- endfor %}
@@ -18,7 +18,7 @@ curl 'https://api.13012345822.com/api/{{ module_name }}.{{ class_name }}/create/
   "msg": "成功",
   "data": {
     {%- for property in properties %}
-    "{{ property.field_name }}": {% if property.property_type == "string" %}"{{ property.example_value }}"{% elif property.property_type == "json" %}{{ property.example_value|replace('"', '')|replace("'", "") }}{% else %}{{ property.example_value }}{% endif %}{% if not loop.last %},{% endif %} // {{ property.field_comment or table_comment+property.field_name }}
+    "{{ property.field_name }}": {% if property.property_type == "string" and property.example_value == "" %}"{{ property.example_value }}"{% elif property.property_type == "json" %}{{ property.example_value|replace('"', '')|replace("'", "") }}{% else %}{{ property.example_value }}{% endif %}{% if not loop.last %},{% endif %} // {{ property.field_comment or table_comment+property.field_name }}
     {%- endfor %}
   }
 }
