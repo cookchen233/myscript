@@ -67,16 +67,7 @@ class Generator:
             # 生成枚举（添加在其他生成器之前）
             self.generate_enum(path)
 
-            # 生成Model
-            model_generator = ModelGenerator(
-                class_name + "Model",
-                os.path.join(self.base_paths['model'], module_name)
-            )
-            model_generator.set_mysql_connection(**self.mysql_config)
-            model_generator.set_module_name(module_name)
-            model_generator.set_table_prefix(self.table_prefix)
-            model_generator.set_force(self.force)
-            model_generator.generate()
+            self.generate_model(path)
 
             # 生成控制器
             controller_generator = ControllerGenerator(
@@ -254,6 +245,20 @@ class Generator:
         except Exception as e:
             print(f"Error generating enum files: {str(e)}")
             raise
+
+    def generate_model(self, path: str) -> None:
+        """生成Model"""
+        module_name, table_name = self.parse_path(path)
+        class_name = snake_to_camel(table_name, True)  # 转换表名为驼峰形式
+        model_generator = ModelGenerator(
+            class_name + "Model",
+            os.path.join(self.base_paths['model'], module_name)
+        )
+        model_generator.set_mysql_connection(**self.mysql_config)
+        model_generator.set_module_name(module_name)
+        model_generator.set_table_prefix(self.table_prefix)
+        model_generator.set_force(self.force)
+        model_generator.generate()
 
     def generate_dto(self, path: str, comment: str, properties: str) -> None:
         """生成DTO文件"""
