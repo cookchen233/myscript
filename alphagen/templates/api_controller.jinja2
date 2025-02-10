@@ -27,21 +27,45 @@ class {{class_name}} extends CrudController
     */
     protected function applyListQueryConditions(Query $query): static
     {
+        {% if has_member_id %}$query->where("member_id", $this->member_id);{% endif %}
         return $this;
     }
 
     /**
     * 处理列表结果
     */
-    protected function processListResult(Paginator $dataset): void
+    protected function processListResult(Paginator $dataset)
     {
     }
 
     /**
     * 处理详情结果
     */
-    protected function processReadResult(&$data): void
+    protected function processReadResult(&$data)
     {
+    }
+
+    /**
+    * 验证创建数据
+    */
+    protected function validateData(array $data)
+    {
+    }
+
+    /**
+    * 处理创建数据
+    */
+    protected function processCreateData(array $data): array
+    {
+        return $data;
+    }
+
+    /**
+    * 处理创建数据
+    */
+    protected function processUpdateData(array $data): array
+    {
+        return $data;
     }
 
     public function create() {
@@ -55,4 +79,13 @@ class {{class_name}} extends CrudController
     public function delete($id) {
         return fail("该功能暂未实现");
     }
+
+    protected function afterUpdate($model)
+    {
+    }
+
+    protected function afterCreate($model)
+    {
+    }
+
 }

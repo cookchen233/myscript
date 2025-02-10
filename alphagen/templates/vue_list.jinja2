@@ -266,8 +266,7 @@ const handleExport = () => {
         ElMessage.warning('请先选择要导出的记录')
         return
     }
-
-    window.location.href = `${API.export}&${selection.map(item => "id[]="+item.id).join("&")}`
+    window.location.href = `${API.export}&${selection.map(item => "id[]="+item.id).join("&")}&sort_field=${query.sort_field}&sort_order=${query.sort_order}`
 }
 
 const handleOperation = async (row: any) => {

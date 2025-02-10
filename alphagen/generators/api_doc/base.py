@@ -121,7 +121,7 @@ class ApiDocBaseGenerator(BaseGenerator):
         if field_name.endswith('_img') or field_name.endswith('_image'):
             return "https://xx.png"
         elif 'imgs' in field_name or 'images' in field_name:
-            return ["https://xx.png", "https://xx2.png"]
+            return []
         elif comment.endswith('[json]'):
             return '{}'
         elif property_type == "number" and comment.endswith(']'):

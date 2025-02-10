@@ -32,16 +32,39 @@ class {{class_name}} extends CrudController
     /**
     * 处理列表结果
     */
-    protected function processListResult(Paginator $dataset): void
+    protected function processListResult(Paginator $dataset)
     {
     }
 
-    protected function processReadResult(&$data): void
+    protected function processReadResult(&$data)
     {
         //$data->product_ids = $data->products ? array_column($data->products->toArray(), 'id') : [];
     }
 
-    protected function afterUpdate($data)
+    /**
+    * 验证创建数据
+    */
+    protected function validateData(array $data)
+    {
+    }
+
+    /**
+    * 处理创建数据
+    */
+    protected function processCreateData(array $data): array
+    {
+        return $data;
+    }
+
+    /**
+    * 处理创建数据
+    */
+    protected function processUpdateData(array $data): array
+    {
+        return $this->processCreateData($data);
+    }
+
+    protected function afterUpdate($model)
     {
         // 处理关联数据
         if (isset($data['product_ids'])) {
@@ -51,7 +74,7 @@ class {{class_name}} extends CrudController
         }
     }
 
-    protected function afterCreate($data)
+    protected function afterCreate($model)
     {
         // 处理关联数据
         if (isset($data["product_ids"])) {
