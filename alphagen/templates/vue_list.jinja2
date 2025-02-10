@@ -21,7 +21,7 @@
                 :can-delete-="false"
                 :can-edit-="false"
                 :can-add-="false"
-                :selectable-="true"
+                :selectable="canBatch || canExport"
                 :opts-="[
       {
         txt: '审批记录',
@@ -67,6 +67,7 @@
                 {%- for button in batch_buttons %}
                     <el-button type="{{ button.type }}" @click='handleBatchUpdate({{ button.update_data | tojson }}, "{{ button.confirm_message }}")'>{{ button.text }}</el-button>
                 {%- endfor %}
+                <el-button v-if="canExport" type="primary" @click="handleExport">导出</el-button>
             </template>
             {%- for field in table_fields %}
                 <el-table-column prop="{{ field.field }}" label="{{ field.label }}" {% if field.width %} width="{{ field.width }}"{% endif %}{% if field.align %} align="{{ field.align }}"{% endif %}{% if field.type == 'text' %} show-overflow-tooltip{% endif %}>
@@ -164,6 +165,11 @@ const props = defineProps({
 const { $lc } = useGlobalProperties()
 const route = useRoute()
 
+const {MODE, VITE_PROXY_TARGET} = import.meta.env
+const token = $lc.db.get("admin_token")
+const site_id=$lc.db.get("site_id")
+const headers={"admin-token": token, "site-id": site_id}
+
 const API = {
   list: '/{{ module_name }}.{{ class_name }}/list',
   delete: '/{{ module_name }}.{{ class_name }}/delete',
@@ -173,6 +179,7 @@ const API = {
   restoreBatch: '/{{ module_name }}.{{ class_name }}/restoreBatch',
   {%- endif %}
   updateBatch: '/{{ module_name }}.{{ class_name }}/updateBatch',
+  export: VITE_PROXY_TARGET+'/admin/insale.InsaleWithdraw/list?export=1&admin_token='+encodeURIComponent(token)+"&site_id="+site_id,
   audit: '/{{ module_name }}.{{ class_name }}/audit',
   settle: '/{{ module_name }}.{{ class_name }}/settle',
 }
@@ -249,6 +256,18 @@ const handleBatchUpdate = async (updateData: any, message = '确定要批量更�
       console.error(e)
     }
   }
+}
+
+const canBatch = ref(false)
+const canExport = ref(false)
+const handleExport = () => {
+    const selection = baseListRef.value?.getSelectedRows()
+    if (!selection?.length) {
+        ElMessage.warning('请先选择要导出的记录')
+        return
+    }
+
+    window.location.href = `${API.export}&${selection.map(item => "id[]="+item.id).join("&")}`
 }
 
 const handleOperation = async (row: any) => {
