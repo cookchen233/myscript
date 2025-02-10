@@ -62,8 +62,12 @@ class ShoutServer:
         ]
         
         cleaned_text = text
+        # 替换特殊字符
         for char in special_chars:
             cleaned_text = cleaned_text.replace(char, ' ')
+        
+        # 替换数字为空格
+        cleaned_text = ''.join(' ' if c.isdigit() else c for c in cleaned_text)
         
         # 移除多余的空格
         cleaned_text = ' '.join(cleaned_text.split())

@@ -27,6 +27,12 @@
         txt: '审批记录',
         type: 'warning',
         event: handleXxDialogOpen,
+      },
+      {
+        txt: '结算',
+        type: 'warning',
+        disabled:row=>row.id === 0,
+        event: handleOperation,
       }
     ]"
                 :show-search="!props.query"
@@ -104,6 +110,23 @@
     <!-- <el-dialog v-model="xxDialogVisible" title="列表" width="80%" destroy-on-close > -->
     <!-- <XxList :query="xxQuery" :on-edit-success="onEditSuccess" /> -->
     <!-- </el-dialog> -->
+
+    <!-- 操作弹窗 -->
+    <el-dialog v-model="operationDialogVisible" title="操作" width="500px" destroy-on-close>
+        <el-form :model="operationForm" label-width="100px">
+            <el-form-item label="交车照片">
+                <select-file v-model="operationForm.reward_images" multiple type="image"/>
+            </el-form-item>
+            <el-form-item label="备注">
+                <el-input v-model="operationForm.reward_remark" type="textarea" :rows="3" placeholder="请输入备注"/>
+            </el-form-item>
+        </el-form>
+        <template #footer>
+            <el-button @click="operationDialogVisible = false">取消</el-button>
+            <el-button type="primary" @click="operationSubmit">确定</el-button>
+        </template>
+    </el-dialog>
+
 </template>
 
 <script lang="ts" setup>
@@ -150,6 +173,8 @@ const API = {
   restoreBatch: '/{{ module_name }}.{{ class_name }}/restoreBatch',
   {%- endif %}
   updateBatch: '/{{ module_name }}.{{ class_name }}/updateBatch',
+  audit: '/{{ module_name }}.{{ class_name }}/audit',
+  settle: '/{{ module_name }}.{{ class_name }}/settle',
 }
 
 const baseListRef = ref<InstanceType<typeof BaseList> | null>(null)
@@ -226,5 +251,35 @@ const handleBatchUpdate = async (updateData: any, message = '确定要批量更�
   }
 }
 
+const handleOperation = async (row: any) => {
+    try {
+        await ElMessageBox.confirm('确定结算吗？')
+        const url = API.settle
+        const data = {id: row.id,}
+        await $lc.submit(url, data)
+        onEditSuccess?.(data)
+    } catch (e) {
+        if (e !== 'cancel') {
+            console.error(e)
+        }
+    }
+}
+
+// 操作弹窗
+const currentRow = ref<any>(null)
+const operationDialogVisible = ref(false)
+const operationForm = reactive({})
+
+const handleTransfer = (row: any) => {
+    currentRow.value = row
+    operationForm.value = currentRow.value
+    operationDialogVisible.value = true
+}
+
+const operationSubmit = async () => {
+    await $lc.submit(API.audit, operationForm)
+    operationDialogVisible.value = false
+    baseListRef.value?.reload()
+}
 </script>
 {{ '' }}
