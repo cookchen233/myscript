@@ -64,9 +64,11 @@
             </template>
 
             <template #extra-buttons>
+                <template v-if="canBatch">
                 {%- for button in batch_buttons %}
                     <el-button type="{{ button.type }}" @click='handleBatchUpdate({{ button.update_data | tojson }}, "{{ button.confirm_message }}")'>{{ button.text }}</el-button>
                 {%- endfor %}
+                </template>
                 <el-button v-if="canExport" type="primary" @click="handleExport">导出</el-button>
             </template>
             {%- for field in table_fields %}

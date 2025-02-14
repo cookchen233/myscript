@@ -75,8 +75,6 @@ class ApiDocBaseGenerator(BaseGenerator):
 
             property_type = self._get_property_type(field)
             example_value = self._get_example_value(field, property_type)
-            if property_type != "number" and property_type !="json"  and example_value != "":
-                example_value = '"' + example_value + '"'
 
             if comment:
                 field_comment = comment.replace("[", "(").replace("]", ")").replace(":", "：").replace(",", "，").replace("(json)", "(数组)")
