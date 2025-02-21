@@ -358,7 +358,7 @@ if [[ -n "$ZSH_NAME" ]]; then
     zle -N _query_space
     bindkey " " _query_space
 
-    # Ctrl+T 触发 fzf
+    # Option+T 触发 fzf
     if (( ${+commands[fzf]} )); then
         _query_fzf() {
             local buffer="$LBUFFER"
@@ -378,6 +378,9 @@ if [[ -n "$ZSH_NAME" ]]; then
             fi
         }
         zle -N _query_fzf
-        bindkey '^T' _query_fzf
+        # 使用多种可能的绑定方式
+        bindkey '†' _query_fzf      # Option+T 在某些终端下的输出
+        bindkey '\M-t' _query_fzf   # Meta+T
+        bindkey '\e[116;3u' _query_fzf  # 某些终端的 Option+T
     fi
 fi
