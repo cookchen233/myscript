@@ -89,6 +89,7 @@ p {
 }
 
 source ~/Coding/myscript/mysql_query.sh
+source ~/Coding/myscript/clean_orphans.sh
 alias dm=delete_member_and_related
 alias dmcc=check_and_clean_orphans
 alias q=query
