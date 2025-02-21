@@ -64,7 +64,7 @@ class {{class_name}} extends CrudController
         return $this->processCreateData($data);
     }
 
-    protected function afterUpdate($model)
+    protected function afterUpdate($model, $oldModel)
     {
         // 处理关联数据
         if (isset($data['product_ids'])) {
