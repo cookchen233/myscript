@@ -71,6 +71,7 @@ query() {
     local primary_key="id"
     local main_alias=""
 
+    # 处理命令行选项
     while [[ "$1" =~ ^- ]]; do
         case "$1" in
             -v) verbose=1; shift;;
@@ -79,6 +80,7 @@ query() {
         esac
     done
 
+    # 处理表名和别名（确保第一个参数总是表名）
     if [ -n "$1" ]; then
         for entry in "${TABLE_ALIAS[@]}"; do
             local alias="${entry%%:*}"
@@ -90,9 +92,22 @@ query() {
                 break
             fi
         done
-        # 如果没有匹配到别名，直接使用输入作为表名
-        [ "$table" = "lc_member" ] && table="lc_$1" && shift
+        # 如果没有匹配到别名，使用输入作为表名
+        if [ "$table" = "lc_member" ]; then
+            table="lc_$1"
+            table=${table/lc_lc_/lc_}
+            main_alias="$1"
+            shift
+        fi
+        # 处理显式指定的主表别名
+        if [ -n "$1" ] && [[ ! "$1" =~ (j|where|limit|desc|asc|=) ]]; then
+            main_alias="$1"
+            shift
+        fi
     fi
+
+    # 如果 main_alias 仍为空，使用表名作为默认别名（去掉 lc_ 前缀）
+    [ -z "$main_alias" ] && main_alias="${table#lc_}"
 
     primary_key=$(
         MYSQL_PWD="$DB_PASSWORD" \
@@ -106,6 +121,7 @@ query() {
     )
     [ -z "$primary_key" ] && primary_key="id"
 
+    # 处理剩余参数
     while [ -n "$1" ]; do
         case "$1" in
             [0-9]*) condition="${primary_key} = '$1'"; shift;;
@@ -118,41 +134,51 @@ query() {
             j)
                 shift
                 [ -z "$1" ] && { echo "缺少 JOIN 表名"; return 1; }
-                local join_alias="$1"
+                local join_alias=""
                 local join_table=""
                 for entry in "${TABLE_ALIAS[@]}"; do
                     if [ "${entry%%:*}" = "$1" ]; then
                         join_table="${entry##*:}"
+                        join_alias="$1"
                         break
                     fi
                 done
-                [ -z "$join_table" ] && join_table="lc_$1" # 如果没有匹配到别名，直接使用输入作为表名
+                [ -z "$join_table" ] && join_table="lc_$1" && join_table=${join_table/lc_lc_/lc_} && join_alias="$1"
                 shift
-                if [ -n "$1" ] && [[ ! "$1" =~ (asc|desc|limit) ]]; then
+                if [ -n "$1" ] && [[ ! "$1" =~ (where|limit|desc|asc|=) ]]; then
+                    join_alias="$1"
+                    shift
+                fi
+                if [ -n "$1" ] && [[ ! "$1" =~ (where|limit|desc|asc) ]]; then
                     local join_condition="$1"
-                    join_condition="${join_condition//${main_alias}./${table}.}"
-                    join_condition="${join_condition//${join_alias}./${join_alias}.}"
                     join="LEFT JOIN ${join_table} ${join_alias} ON ${join_condition}"
                     shift
                 else
-                    join="LEFT JOIN ${join_table} ${join_alias} ON ${table}.${primary_key} = ${join_alias}.shop_id"
+                    join="LEFT JOIN ${join_table} ${join_alias} ON ${main_alias}.${primary_key} = ${join_alias}.shop_id"
                 fi
                 ;;
-            [a-z]*\ asc) order_by="ORDER BY ${1% asc} ASC"; shift;;
-            [a-z]*\ desc) order_by="ORDER BY ${1% desc} DESC"; shift;;
+            where)
+                shift
+                if [ -n "$1" ] && [[ ! "$1" =~ (limit|desc|asc) ]]; then
+                    condition="${condition:+$condition AND }$1"
+                    shift
+                fi
+                ;;
+            [a-z.]*\ asc) order_by="ORDER BY ${1% asc} ASC"; shift;;
+            [a-z.]*\ desc) order_by="ORDER BY ${1% desc} DESC"; shift;;
             limit\ [0-9]*) limit="LIMIT ${1#limit }"; shift;;
             *) echo "无效参数: $1"; return 1;;
         esac
     done
 
-    [ -z "$order_by" ] && order_by="ORDER BY ${table}.${primary_key} DESC"
+    [ -z "$order_by" ] && order_by="ORDER BY ${main_alias}.${primary_key} DESC"
 
-    local site_condition="${table}.site_id = ${SITE_ID}"
+    local site_condition="${main_alias}.site_id = ${SITE_ID}"
     condition="${site_condition}${condition:+ AND $condition}"
 
     local main_cols
     [ -z "$fields" ] && main_cols=$(get_short_columns "$table") || main_cols="$fields"
-    main_cols=$(echo "$main_cols" | awk -F',' -v tbl="$table" '{for(i=1;i<=NF;i++) printf "%s%s.%s", (i>1?",":""), tbl, $i}')
+    main_cols=$(echo "$main_cols" | awk -F',' -v alias="$main_alias" '{for(i=1;i<=NF;i++) printf "%s%s.%s", (i>1?",":""), alias, $i}')
 
     local select_clause="SELECT ${main_cols}"
     if [ -n "$join" ]; then
@@ -161,7 +187,7 @@ query() {
         select_clause+=", ${join_cols}"
     fi
 
-    local sql="${select_clause} FROM ${table} ${join} WHERE ${condition} ${order_by} ${limit};"
+    local sql="${select_clause} FROM ${table} ${main_alias} ${join} WHERE ${condition} ${order_by} ${limit};"
 
     if [ "$verbose" -eq 1 ]; then
         echo "Tables: ${table}${join:+ + $join_alias}"
@@ -187,7 +213,6 @@ query() {
         fi
     fi
 }
-
 # 获取数据库中的所有表名（用于补全）
 get_all_tables() {
     MYSQL_PWD="$DB_PASSWORD" \
@@ -252,7 +277,65 @@ if [[ -n "$ZSH_NAME" ]]; then
         echo "${tables[*]}|${aliases[*]}"
     }
 
-    # 标准补全函数（Tab 触发）
+    # 获取表的所有字段
+    get_table_fields() {
+        local table="$1"
+        local full_table=$(get_table_full_name "$table")
+        MYSQL_PWD="$DB_PASSWORD" \
+        mysql -h"$DB_HOST" -u"$DB_USER" "$DB_NAME" -N -e "
+        SELECT COLUMN_NAME
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = '$DB_NAME'
+          AND TABLE_NAME = '$full_table'
+        ORDER BY ORDINAL_POSITION;" 2>/dev/null
+    }
+
+    # 空格触发 fzf 字段补全
+    _query_field_fzf() {
+        if ! (( ${+commands[fzf]} )); then
+            zle self-insert
+            return
+        fi
+
+        local buffer="$LBUFFER"
+        local -a context_tables context_aliases
+        local context=$(_get_context_tables "$buffer")
+        context_tables=("${(@s/|/)context}[1]")
+        context_tables=("${(@s/ /)context_tables}")
+        context_aliases=("${(@s/|/)context}[2]")
+        context_aliases=("${(@s/ /)context_aliases}")
+
+        # 如果没有表上下文，普通空格
+        if [ ${#context_tables[@]} -eq 0 ]; then
+            zle self-insert
+            return
+        fi
+
+        # 收集所有相关表的字段
+        local -a all_fields
+        for i in {1..${#context_tables}}; do
+            local tbl="${context_tables[$i]}"
+            local alias="${context_aliases[$i]:-$tbl}"
+            local fields=($(get_table_fields "$tbl"))
+            for f in "${fields[@]}"; do
+                all_fields+=("${alias}.${f}")
+            done
+        done
+
+        # 使用 fzf 选择字段
+        local selected
+        selected=$(printf "%s\n" "${all_fields[@]}" | fzf --prompt="选择字段 > " --height=40% --border --query="")
+        if [ -n "$selected" ]; then
+            LBUFFER="$buffer$selected"
+            zle reset-prompt
+        fi
+    }
+
+    # 创建并绑定小部件到空格键（覆盖之前的 _query_space）
+    zle -N _query_field_fzf
+    bindkey " " _query_field_fzf
+
+    # 修改 Tab 补全，支持字段建议
     _query() {
         _ensure_table_fields
         local curcontext="$curcontext" state line
@@ -289,7 +372,7 @@ if [[ -n "$ZSH_NAME" ]]; then
                         for i in {1..${#context_tables}}; do
                             local tbl="${context_tables[$i]}"
                             local alias="${context_aliases[$i]:-$tbl}"
-                            local tbl_fields=(${(s: :)TABLE_FIELDS[$tbl]})
+                            local tbl_fields=($(get_table_fields "$tbl"))
                             for f in "${tbl_fields[@]}"; do
                                 fields+=("${alias}.${f}")
                             done
@@ -299,13 +382,14 @@ if [[ -n "$ZSH_NAME" ]]; then
                     *)
                         options=(
                             "j:加入 JOIN 表"
+                            "where:添加 WHERE 条件"
                             "limit:限制结果数量"
                         )
                         local -a fields
                         for i in {1..${#context_tables}}; do
                             local tbl="${context_tables[$i]}"
                             local alias="${context_aliases[$i]:-$tbl}"
-                            local tbl_fields=(${(s: :)TABLE_FIELDS[$tbl]})
+                            local tbl_fields=($(get_table_fields "$tbl"))
                             for f in "${tbl_fields[@]}"; do
                                 options+=("${alias}.${f}=:按 ${f} 字段查询")
                                 options+=("${alias}.${f} asc:按 ${f} 升序排序")
