@@ -19,7 +19,7 @@ DB_PASSWORD="Cc@123456"
 
 : ${SITE_ID:=20}
 
-RELATED_TABLES=(
+ TABLE_ALIAS=(
     "m:lc_member"
     "mt:lc_member_token"
     "mw:lc_member_weixin"
@@ -80,7 +80,7 @@ query() {
     # 解析表名，优先检查别名
     if [ -n "$1" ]; then
         local found=0
-        for entry in "${RELATED_TABLES[@]}"; do
+        for entry in "${TABLE_ALIAS[@]}"; do
             local alias="${entry%%:*}"
             local full_table="${entry##*:}"
             if [ "$1" = "$alias" ]; then
