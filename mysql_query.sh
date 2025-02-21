@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env zsh
 
 # -----------------------------
 # 函数：查询指定表的数据
@@ -90,6 +90,8 @@ query() {
                 break
             fi
         done
+        # 如果没有匹配到别名，直接使用输入作为表名
+        [ "$table" = "lc_member" ] && table="lc_$1" && shift
     fi
 
     primary_key=$(
@@ -107,7 +109,7 @@ query() {
     while [ -n "$1" ]; do
         case "$1" in
             [0-9]*) condition="${primary_key} = '$1'"; shift;;
-            *=*) 
+            *=*)
                 local key="${1%%=*}"
                 local value="${1#*=}"
                 condition="${condition:+$condition AND }${key} = '${value}'"
@@ -124,12 +126,12 @@ query() {
                         break
                     fi
                 done
-                [ -z "$join_table" ] && join_table="lc_$1"
+                [ -z "$join_table" ] && join_table="lc_$1" # 如果没有匹配到别名，直接使用输入作为表名
                 shift
                 if [ -n "$1" ] && [[ ! "$1" =~ (asc|desc|limit) ]]; then
                     local join_condition="$1"
                     join_condition="${join_condition//${main_alias}./${table}.}"
-                    join_condition="${join_condition//${join_alias}./${join_alias}.}"  # 使用别名而不是表名
+                    join_condition="${join_condition//${join_alias}./${join_alias}.}"
                     join="LEFT JOIN ${join_table} ${join_alias} ON ${join_condition}"
                     shift
                 else
@@ -185,3 +187,154 @@ query() {
         fi
     fi
 }
+
+# 获取数据库中的所有表名（用于补全）
+get_all_tables() {
+    MYSQL_PWD="$DB_PASSWORD" \
+    mysql -h"$DB_HOST" -u"$DB_USER" "$DB_NAME" -N -e "
+    SELECT TABLE_NAME
+    FROM INFORMATION_SCHEMA.TABLES
+    WHERE TABLE_SCHEMA = '$DB_NAME'
+    ORDER BY TABLE_NAME;" 2>/dev/null
+}
+
+get_table_aliases() {
+    for entry in "${TABLE_ALIAS[@]}"; do
+        echo "${entry%%:*}"
+    done
+}
+
+get_table_full_name() {
+    local alias="$1"
+    for entry in "${TABLE_ALIAS[@]}"; do
+        if [[ "${entry%%:*}" == "$alias" ]]; then
+            echo "${entry##*:}"
+            return
+        fi
+    done
+    echo "$alias"  # 如果没有别名映射，直接返回输入
+}
+
+# 主逻辑：直接调用 query
+query "$@"
+
+# Zsh 补全与空格触发逻辑
+if [[ -n "$ZSH_NAME" ]]; then
+    # 标准补全函数（Tab 触发）
+    _query() {
+        local curcontext="$curcontext" state line
+        typeset -A opt_args
+
+        local -a all_tables
+        all_tables=($(get_all_tables))
+
+        _arguments -C \
+            '1:表名:->tables' \
+            '*:参数:->params' && return 0
+
+        case "$state" in
+            tables)
+                _describe -t tables "表名" all_tables && return 0
+                ;;
+            params)
+                local -a options
+                local selected_table="${words[2]}"
+                if [[ -n "$selected_table" && " ${all_tables[*]} " =~ " $selected_table " ]]; then
+                    local fields=($(get_short_columns "$selected_table" | tr ',' '\n'))
+                fi
+
+                case "${words[$CURRENT-1]}" in
+                    j)
+                        options=("${all_tables[@]/%/:JOIN 表}")
+                        ;;
+                    limit)
+                        options=("10" "20" "50" "100")
+                        ;;
+                    *=*)
+                        if [[ -n "${fields[*]}" ]]; then
+                            options=("${fields[@]}")
+                        else
+                            options=("id" "name" "title")
+                        fi
+                        ;;
+                    *)
+                        options=(
+                            "j:加入 JOIN 表"
+                            "limit:限制结果数量"
+                        )
+                        if [[ -n "${fields[*]}" ]]; then
+                            for field in "${fields[@]}"; do
+                                options+=("${field}=:按 ${field} 字段查询")
+                            done
+                            options+=("${fields[@]/%/ asc}:按字段升序排序")
+                            options+=("${fields[@]/%/ desc}:按字段降序排序")
+                        else
+                            options+=(
+                                "id=:按 ID 查询"
+                                "name=:按名称查询"
+                                "id asc:按 ID 升序排序"
+                                "id desc:按 ID 降序排序")
+                        fi
+                        ;;
+                esac
+                _describe -t params "参数" options && return 0
+                ;;
+        esac
+    }
+
+    # 注册 Tab 补全
+    compdef _query query
+
+    # 空格触发 fzf 补全
+    _query_space() {
+        local buffer="$LBUFFER"
+        # 检查是否精确匹配 "query "
+        if [[ "$buffer" == "query" ]]; then
+            # 如果输入 "query" 后直接按空格，添加空格并触发 fzf
+            LBUFFER="query "
+            if (( ${+commands[fzf]} )); then
+                local selected
+                selected=$(get_all_tables | fzf --prompt="选择表名 > " --height=40% --border --query="")
+                if [[ -n "$selected" ]]; then
+                    LBUFFER="query $selected "
+                    zle reset-prompt
+                fi
+            else
+                zle expand-or-complete
+            fi
+        elif [[ "$buffer" == "query " ]]; then
+            # 如果已经输入 "query "，直接触发 fzf
+            if (( ${+commands[fzf]} )); then
+                local selected
+                selected=$(get_all_tables | fzf --prompt="选择表名 > " --height=40% --border --query="")
+                if [[ -n "$selected" ]]; then
+                    LBUFFER="query $selected "
+                    zle reset-prompt
+                fi
+            else
+                zle expand-or-complete
+            fi
+        else
+            # 其他情况，正常输入空格
+            zle self-insert
+        fi
+    }
+
+    # 创建并绑定小部件到空格键
+    zle -N _query_space
+    bindkey " " _query_space
+
+    # 可选：Ctrl+T 触发 fzf
+    if (( ${+commands[fzf]} )); then
+        _query_fzf() {
+            local selected
+            selected=$(get_all_tables | fzf --prompt="选择表名 > " --height=40% --border)
+            if [[ -n "$selected" ]]; then
+                LBUFFER="query $selected "
+                zle reset-prompt
+            fi
+        }
+        zle -N _query_fzf
+        bindkey '^R' _query_fzf
+    fi
+fi

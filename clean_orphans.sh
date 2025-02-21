@@ -10,7 +10,6 @@ DB_PASSWORD="Cc@123456"
 
 # 相关联表（别名:表名）
 RELATED_TABLES=(
-    "m:lc_member"
     "mt:lc_member_token"
     "mw:lc_member_weixin"
     "eo:lc_ec_order"
@@ -34,7 +33,7 @@ RELATED_TABLES=(
 # delete_member_and_related 444
 # -----------------------------
 check_and_clean_orphans() {
-    echo "正在查询孤儿记录..."
+    echo "查询孤儿记录..."
 
     # 动态生成 UNION ALL 查询
     # 将每张表里 “member_id 在 lc_member 中不存在” 的行 UNION 汇总
@@ -97,7 +96,7 @@ EOF
 
             case "$choice" in
                 [Yy]*|"")  # 添加 "" 表示回车默认确认
-                    echo "正在删除孤儿记录..."
+                    echo "删除孤儿记录..."
                     for table_entry in "${RELATED_TABLES[@]}"; do
                         table="${table_entry##*:}"
                         # 只删除 该子表中 LEFT JOIN lc_member 不匹配的记录
@@ -139,7 +138,7 @@ delete_member_and_related() {
 
     member_id="$1"
 
-    echo "正在查询与 member_id=${member_id} 相关的记录..."
+    echo "查询 member_id=${member_id} 相关记录..."
 
     select_clause="SELECT m.member_id AS m_member_id, "
     join_clause=""
@@ -165,7 +164,6 @@ EOF
     if [ -z "$related" ] || [ "${#related}" -lt 10 ]; then
         echo
         echo "未在所有关联表中找到 member_id=${member_id} 的相关记录。"
-        echo "如需确认请手动检查。"
         return 0
     fi
 
