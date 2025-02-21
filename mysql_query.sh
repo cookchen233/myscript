@@ -4,12 +4,11 @@
 # 函数：查询指定表的数据
 # 用法示例：
 #   query 1                   # ...lc_member WHERE member_id(primary key)=1 AND site_id=20
-#   query name=xx                   # lc_member WHERE name="xx" AND site_id=20 ORDER BY member_id DESC LIMIT 10
-#   query es 123               # lc_ec_shop WHERE id=123 AND site_id=20
-#   query es name=xx            # lc_ec_shop WHERE name='xx' AND site_id=20 ORDER BY id DESC LIMIT 10
-#   query es name=xx id asc          # lc_ec_shop WHERE name='xx' AND site_id=20 ORDER BY id ASC LIMIT 10
-#   query es name=xx id asc limit 20          # lc_ec_shop WHERE name='xx' AND site_id=20 ORDER BY id ASC LIMIT 20
-#   query es j eo es.id=eo.shop_id           # lc_ec_shop JOIN lc_ec_order on lc_ec_order.shop_id=lc_ec_shop.id WHERE lc_ec_shop.site_id=20
+#   query name=xx             # lc_member WHERE name="xx" AND site_id=20 ORDER BY member_id DESC LIMIT 10
+#   query es 123              # lc_ec_shop WHERE id=123 AND site_id=20
+#   query es name=xx          # lc_ec_shop WHERE name='xx' AND site_id=20 ORDER BY id DESC LIMIT 10
+#   query es name=xx id asc   # lc_ec_shop WHERE name='xx' AND site_id=20 ORDER BY id ASC LIMIT 10
+#   query es j eo es.id=eo.shop_id  # lc_ec_shop JOIN lc_ec_order on lc_ec_order.shop_id=lc_ec_shop.id
 # -----------------------------
 
 DB_HOST="118.25.213.19"
@@ -35,6 +34,7 @@ TABLE_ALIAS=(
     "sl:lc_insale_salary_log"
 )
 
+# 获取表的简短字段列表（用于查询显示）
 get_short_columns() {
     local tbl="$1"
     local cols=$(
@@ -59,6 +59,7 @@ get_short_columns() {
     [ -z "$cols" ] && echo "id" || echo "$cols" | tr '\n' ',' | sed 's/,$//'
 }
 
+# 主查询函数
 query() {
     local table="lc_member"
     local condition=""
@@ -71,7 +72,6 @@ query() {
     local primary_key="id"
     local main_alias=""
 
-    # 处理命令行选项
     while [[ "$1" =~ ^- ]]; do
         case "$1" in
             -v) verbose=1; shift;;
@@ -92,7 +92,6 @@ query() {
                 break
             fi
         done
-        # 如果没有匹配到别名，使用输入作为表名
         if [ "$table" = "lc_member" ]; then
             table="lc_$1"
             table=${table/lc_lc_/lc_}
@@ -121,7 +120,6 @@ query() {
     )
     [ -z "$primary_key" ] && primary_key="id"
 
-    # 处理剩余参数
     while [ -n "$1" ]; do
         case "$1" in
             [0-9]*) condition="${primary_key} = '$1'"; shift;;
@@ -213,7 +211,8 @@ query() {
         fi
     fi
 }
-# 获取数据库中的所有表名（用于补全）
+
+# 获取所有表名（用于表名补全）
 get_all_tables() {
     MYSQL_PWD="$DB_PASSWORD" \
     mysql -h"$DB_HOST" -u"$DB_USER" "$DB_NAME" -N -e "
@@ -223,6 +222,7 @@ get_all_tables() {
     ORDER BY TABLE_NAME;" 2>/dev/null
 }
 
+# 获取完整表名
 get_table_full_name() {
     local alias="$1"
     for entry in "${TABLE_ALIAS[@]}"; do
@@ -231,15 +231,44 @@ get_table_full_name() {
             return
         fi
     done
-    echo "$alias"  # 如果没有别名映射，直接返回输入
+    echo "$alias"
 }
 
-# 主逻辑：直接调用 query
+# 获取表的所有字段
+get_table_fields() {
+    local table="$1"
+    local full_table=$(get_table_full_name "$table")
+    MYSQL_PWD="$DB_PASSWORD" \
+    mysql -h"$DB_HOST" -u"$DB_USER" "$DB_NAME" -N -e "
+    SELECT COLUMN_NAME
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = '$DB_NAME'
+      AND TABLE_NAME = '$full_table'
+    ORDER BY ORDINAL_POSITION;" 2>/dev/null
+}
+
+# 将输入映射到完整表名
+_get_full_table_name() {
+    local input="$1"
+    if [[ "$input" == lc_* ]]; then
+        echo "$input"
+    else
+        for entry in "${TABLE_ALIAS[@]}"; do
+            if [[ "${entry%%:*}" == "$input" ]]; then
+                echo "${entry##*:}"
+                return
+            fi
+        done
+        echo "lc_$input"
+    fi
+}
+
+# 主逻辑：执行查询
 query "$@"
 
 # Zsh 补全与快捷键逻辑
 if [[ -n "$ZSH_NAME" ]]; then
-    # 延迟加载的字段缓存
+    # 字段缓存
     typeset -g -A TABLE_FIELDS
     _cache_table_fields() {
         local -a all_tables
@@ -249,48 +278,37 @@ if [[ -n "$ZSH_NAME" ]]; then
         done
     }
 
-    # 仅在需要时加载缓存
     _ensure_table_fields() {
         if [[ -z "${TABLE_FIELDS[lc_member]}" ]]; then
             _cache_table_fields
         fi
     }
 
-    # 解析上下文中的表名和别名
+    # 解析上下文中的表和别名
     _get_context_tables() {
-        local -a tables aliases
         local buffer="$1"
+        local -a tables
         tables=()
-        aliases=()
 
         if [[ "$buffer" =~ "query ([^ ]+)" ]]; then
-            tables+=("${match[1]}")
-            aliases+=("")
+            local main_input="${match[1]}"
+            local main_full=$(_get_full_table_name "$main_input")
+            local main_alias="$main_input"
+            tables+=("$main_alias $main_full")
         fi
 
         while [[ "$buffer" =~ "j ([^ ]+)( .*)?$" ]]; do
-            tables+=("${match[1]}")
-            aliases+=("${match[1]}")
+            local join_input="${match[1]}"
+            local join_full=$(_get_full_table_name "$join_input")
+            local join_alias="$join_input"
+            tables+=("$join_alias $join_full")
             buffer="${match[2]}"
         done
 
-        echo "${tables[*]}|${aliases[*]}"
+        echo "${tables[*]}"
     }
 
-    # 获取表的所有字段
-    get_table_fields() {
-        local table="$1"
-        local full_table=$(get_table_full_name "$table")
-        MYSQL_PWD="$DB_PASSWORD" \
-        mysql -h"$DB_HOST" -u"$DB_USER" "$DB_NAME" -N -e "
-        SELECT COLUMN_NAME
-        FROM INFORMATION_SCHEMA.COLUMNS
-        WHERE TABLE_SCHEMA = '$DB_NAME'
-          AND TABLE_NAME = '$full_table'
-        ORDER BY ORDINAL_POSITION;" 2>/dev/null
-    }
-
-    # 空格触发 fzf 字段补全
+    # 修改：空格触发表名或字段提示
     _query_field_fzf() {
         if ! (( ${+commands[fzf]} )); then
             zle self-insert
@@ -298,44 +316,67 @@ if [[ -n "$ZSH_NAME" ]]; then
         fi
 
         local buffer="$LBUFFER"
-        local -a context_tables context_aliases
-        local context=$(_get_context_tables "$buffer")
-        context_tables=("${(@s/|/)context}[1]")
-        context_tables=("${(@s/ /)context_tables}")
-        context_aliases=("${(@s/|/)context}[2]")
-        context_aliases=("${(@s/ /)context_aliases}")
+        local selected
 
-        # 如果没有表上下文，普通空格
-        if [ ${#context_tables[@]} -eq 0 ]; then
+        # 情况 1：query 后提示表名
+        if [[ "$buffer" =~ "^query[ ]*$" ]]; then
+            selected=$(get_all_tables | fzf --prompt="选择表名 > " --height=40% --border --query="")
+            if [ -n "$selected" ]; then
+                LBUFFER="$buffer $selected"
+                zle reset-prompt
+            fi
+            return
+        fi
+
+        # 情况 2：j 后提示表名
+        if [[ "$buffer" =~ "j[ ]*$" ]]; then
+            selected=$(get_all_tables | fzf --prompt="选择 JOIN 表名 > " --height=40% --border --query="")
+            if [ -n "$selected" ]; then
+                LBUFFER="$buffer $selected"
+                zle reset-prompt
+            fi
+            return
+        fi
+
+        # 情况 3：表名后提示字段名
+        local context=$(_get_context_tables "$buffer")
+        local -a table_pairs
+        table_pairs=("${(@s/ /)context}")
+
+        if [ ${#table_pairs[@]} -eq 0 ]; then
             zle self-insert
             return
         fi
 
-        # 收集所有相关表的字段
         local -a all_fields
-        for i in {1..${#context_tables}}; do
-            local tbl="${context_tables[$i]}"
-            local alias="${context_aliases[$i]:-$tbl}"
-            local fields=($(get_table_fields "$tbl"))
+        for pair in "${table_pairs[@]}"; do
+            local alias="${pair%% *}"
+            local full_table="${pair##* }"
+            local fields=($(get_table_fields "$full_table"))
             for f in "${fields[@]}"; do
-                all_fields+=("${alias}.${f}")
+                all_fields+=("${alias}.$f")
             done
         done
 
-        # 使用 fzf 选择字段
-        local selected
+        if [ ${#all_fields[@]} -eq 0 ]; then
+            zle self-insert
+            return
+        fi
+
         selected=$(printf "%s\n" "${all_fields[@]}" | fzf --prompt="选择字段 > " --height=40% --border --query="")
         if [ -n "$selected" ]; then
-            LBUFFER="$buffer$selected"
+            LBUFFER="$buffer $selected"  # 保留空格
             zle reset-prompt
+        else
+            zle self-insert
         fi
     }
 
-    # 创建并绑定小部件到空格键（覆盖之前的 _query_space）
+    # 绑定空格键
     zle -N _query_field_fzf
     bindkey " " _query_field_fzf
 
-    # 修改 Tab 补全，支持字段建议
+    # Tab 补全
     _query() {
         _ensure_table_fields
         local curcontext="$curcontext" state line
@@ -353,12 +394,10 @@ if [[ -n "$ZSH_NAME" ]]; then
                 _describe -t tables "表名" all_tables && return 0
                 ;;
             params)
-                local -a options context_tables context_aliases
+                local -a options context_tables
                 local context=$(_get_context_tables "$BUFFER")
-                context_tables=("${(@s/|/)context}[1]")
-                context_tables=("${(@s/ /)context_tables}")
-                context_aliases=("${(@s/|/)context}[2]")
-                context_aliases=("${(@s/ /)context_aliases}")
+                context_tables=("${(@s/ /)context}")
+                context_tables=("${context_tables[@]%% *}")
 
                 case "${words[$CURRENT-1]}" in
                     j)
@@ -369,9 +408,8 @@ if [[ -n "$ZSH_NAME" ]]; then
                         ;;
                     *=*)
                         local -a fields
-                        for i in {1..${#context_tables}}; do
-                            local tbl="${context_tables[$i]}"
-                            local alias="${context_aliases[$i]:-$tbl}"
+                        for tbl in "${context_tables[@]}"; do
+                            local alias="$tbl"
                             local tbl_fields=($(get_table_fields "$tbl"))
                             for f in "${tbl_fields[@]}"; do
                                 fields+=("${alias}.${f}")
@@ -386,9 +424,8 @@ if [[ -n "$ZSH_NAME" ]]; then
                             "limit:限制结果数量"
                         )
                         local -a fields
-                        for i in {1..${#context_tables}}; do
-                            local tbl="${context_tables[$i]}"
-                            local alias="${context_aliases[$i]:-$tbl}"
+                        for tbl in "${context_tables[@]}"; do
+                            local alias="$tbl"
                             local tbl_fields=($(get_table_fields "$tbl"))
                             for f in "${tbl_fields[@]}"; do
                                 options+=("${alias}.${f}=:按 ${f} 字段查询")
@@ -403,68 +440,28 @@ if [[ -n "$ZSH_NAME" ]]; then
         esac
     }
 
-    # 注册 Tab 补全
     compdef _query query
 
-    # 空格触发 fzf 补全
-    _query_space() {
-        local buffer="$LBUFFER"
-        if [[ "$buffer" == "query" ]]; then
-            if (( ${+commands[fzf]} )); then
-                local selected
-                selected=$(get_all_tables | fzf --prompt="选择表名 > " --height=40% --border --query="")
-                if [[ -n "$selected" ]]; then
-                    LBUFFER="query $selected"
-                    zle reset-prompt
-                fi
-            else
-                zle self-insert
-                zle expand-or-complete
-            fi
-        elif [[ "$buffer" =~ "query[ ]+[^ ]+[ ].*j$" ]]; then
-            if (( ${+commands[fzf]} )); then
-                local selected
-                selected=$(get_all_tables | fzf --prompt="选择 JOIN 表名 > " --height=40% --border --query="")
-                if [[ -n "$selected" ]]; then
-                    LBUFFER="$buffer $selected"
-                    zle reset-prompt
-                fi
-            else
-                zle self-insert
-                zle expand-or-complete
-            fi
-        else
-            zle self-insert
-        fi
-    }
-
-    # 创建并绑定小部件到空格键
-    zle -N _query_space
-    bindkey " " _query_space
-
-    # Option+T 触发 fzf
+    # Option+T 触发表名选择
     if (( ${+commands[fzf]} )); then
         _query_fzf() {
             local buffer="$LBUFFER"
-            if (( ${+commands[fzf]} )); then
-                local selected
-                selected=$(get_all_tables | fzf --prompt="选择表名 > " --height=40% --border --query="")
-                if [[ -n "$selected" ]]; then
-                    if [[ "$buffer" =~ "query[ ]+[^ ]+[ ].*j$" ]]; then
-                        LBUFFER="$buffer $selected"
-                    elif [[ "$buffer" == "query" ]]; then
-                        LBUFFER="query $selected"
-                    else
-                        LBUFFER="$buffer $selected"
-                    fi
-                    zle reset-prompt
+            local selected
+            selected=$(get_all_tables | fzf --prompt="选择表名 > " --height=40% --border --query="")
+            if [[ -n "$selected" ]]; then
+                if [[ "$buffer" =~ "query[ ]+[^ ]+[ ].*j$" ]]; then
+                    LBUFFER="$buffer $selected"
+                elif [[ "$buffer" == "query" ]]; then
+                    LBUFFER="query $selected"
+                else
+                    LBUFFER="$buffer $selected"
                 fi
+                zle reset-prompt
             fi
         }
         zle -N _query_fzf
-        # 使用多种可能的绑定方式
-        bindkey '†' _query_fzf      # Option+T 在某些终端下的输出
-        bindkey '\M-t' _query_fzf   # Meta+T
-        bindkey '\e[116;3u' _query_fzf  # 某些终端的 Option+T
+        bindkey '†' _query_fzf
+        bindkey '\M-t' _query_fzf
+        bindkey '\e[116;3u' _query_fzf
     fi
 fi
