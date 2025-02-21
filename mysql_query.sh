@@ -4,10 +4,10 @@
 # 函数：查询指定表的数据
 # 用法示例：
 #   query 1                   # ...lc_member WHERE member_id(primary key)=1 AND site_id=20
-#   query name=xx             # lc_member WHERE name="xx" AND site_id=20 ORDER BY member_id DESC LIMIT 10
+#   query name=xx             # lc_member WHERE name="xx" AND site_id=20 ORDER BY member_id DESC LIMIT 20
 #   query es 123              # lc_ec_shop WHERE id=123 AND site_id=20
-#   query es name=xx          # lc_ec_shop WHERE name='xx' AND site_id=20 ORDER BY id DESC LIMIT 10
-#   query es name=xx id asc   # lc_ec_shop WHERE name='xx' AND site_id=20 ORDER BY id ASC LIMIT 10
+#   query es name=xx          # lc_ec_shop WHERE name='xx' AND site_id=20 ORDER BY id DESC LIMIT 20
+#   query es name=xx id asc   # lc_ec_shop WHERE name='xx' AND site_id=20 ORDER BY id ASC LIMIT 20
 #   query es j eo es.id=eo.shop_id  # lc_ec_shop JOIN lc_ec_order on lc_ec_order.shop_id=lc_ec_shop.id
 # -----------------------------
 
@@ -16,7 +16,7 @@ DB_NAME="api_13012345822"
 DB_USER="waynechen"
 DB_PASSWORD="Cc@123456"
 
-: ${SITE_ID:=20}
+: ${site:=20}
 
 TABLE_ALIAS=(
     "m:lc_member"
@@ -65,7 +65,7 @@ query() {
     local condition=""
     local join=""
     local order_by=""
-    local limit="LIMIT 10"
+    local limit="LIMIT 20"
     local verbose=1
     local fields=""
     local nowrap=1
@@ -171,7 +171,7 @@ query() {
 
     [ -z "$order_by" ] && order_by="ORDER BY ${main_alias}.${primary_key} DESC"
 
-    local site_condition="${main_alias}.site_id = ${SITE_ID}"
+    local site_condition="${main_alias}.site_id = ${site}"
     condition="${site_condition}${condition:+ AND $condition}"
 
     local main_cols
@@ -264,7 +264,7 @@ _get_full_table_name() {
 }
 
 # 主逻辑：执行查询
-query "$@"
+#query "$@"
 
 # Zsh 补全与快捷键逻辑
 if [[ -n "$ZSH_NAME" ]]; then
@@ -404,7 +404,7 @@ if [[ -n "$ZSH_NAME" ]]; then
                         options=("${all_tables[@]/%/:JOIN 表}")
                         ;;
                     limit)
-                        options=("10" "20" "50" "100")
+                        options=("20" "50" "100")
                         ;;
                     *=*)
                         local -a fields
