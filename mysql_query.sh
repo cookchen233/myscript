@@ -1,7 +1,16 @@
 #!/usr/bin/env bash
 
+DB_HOST="118.25.213.19"
+DB_NAME="api_13012345822"
+DB_USER="waynechen"
+DB_PASSWORD="Cc@123456"
+
+# 默认站点 ID
+: ${SITE_ID:=20}
+
 # 相关联表（别名:表名）
 RELATED_TABLES=(
+    "m:lc_member"
     "mt:lc_member_token"
     "mw:lc_member_weixin"
     "eo:lc_ec_order"
@@ -343,9 +352,129 @@ query() {
     [ -z "$result" ] && echo "无记录" || echo "$result"
 }
 
+# 获取表的短字段
+get_short_columns() {
+    local tbl="$1"
+    local cols=$(
+        MYSQL_PWD="$DB_PASSWORD" \
+        mysql -h"$DB_HOST" -u"$DB_USER" "$DB_NAME" -N -e "
+        SELECT COLUMN_NAME
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = '$DB_NAME'
+          AND TABLE_NAME = '$tbl'
+          AND (
+            COLUMN_NAME = 'id'
+            OR COLUMN_NAME = 'create_time'
+            OR COLUMN_NAME LIKE '%_name'
+            OR COLUMN_NAME LIKE '%_title'
+            OR COLUMN_NAME = 'name'
+            OR COLUMN_NAME = 'title'
+            OR DATA_TYPE IN ('int', 'tinyint', 'smallint', 'mediumint', 'bigint', 'float', 'double', 'decimal')
+            OR (DATA_TYPE = 'varchar' AND CHARACTER_MAXIMUM_LENGTH <= 50)
+          )
+        ORDER BY ORDINAL_POSITION;"
+    )
+    [ -z "$cols" ] && echo "id" || echo "$cols" | tr '\n' ',' | sed 's/,$//'
+}
+
 # 示例调用
-# query d
+# query 1
 # query -v s 123
 # query s n=test o=id desc
 # query s j o on=o.shop_id=es.id s=1
 # query s f=id,name d
+query() {
+    local table="lc_member"  # 默认表
+    local condition=""
+    local join=""
+    local order_limit="LIMIT 10"
+    local verbose=0
+    local fields=""
+
+    # 检查调试模式
+    [ "$1" = "-v" ] && { verbose=1; shift; }
+
+    # 单参数排序
+    if [ "$#" -eq 1 ] && { [ "$1" = "d" ] || [ "$1" = "a" ]; }; then
+        order_limit="ORDER BY id $([ "$1" = "d" ] && echo DESC || echo ASC) LIMIT 10"
+    else
+        # 表名
+        if [ -n "$1" ]; then
+            if [ "${#1}" -eq 1 ]; then
+                for entry in "${RELATED_TABLES[@]}"; do
+                    if [[ "$entry" =~ ^${1}: ]]; then
+                        table="${entry##*:}"
+                        break
+                    fi
+                done
+            else
+                table="lc_${1}"
+            fi
+            shift
+        fi
+
+        # 参数解析
+        while [ "$#" -gt 0 ]; do
+            case "$1" in
+                [0-9]*) condition="WHERE id = $1";;
+                j)  # JOIN
+                    shift
+                    if [ -z "$1" ]; then echo "缺少 JOIN 表名"; return 1; fi
+                    local join_table="lc_${1}"
+                    local alias="$1"
+                    shift
+                    if [[ "$1" =~ ^on= ]]; then
+                        join="LEFT JOIN ${join_table} ${alias} ON ${1#on=}"
+                        shift
+                    else
+                        join="LEFT JOIN ${join_table} ${alias} ON ${alias}.${alias}_id = ${table##lc_}.id"
+                    fi
+                    [ -n "$1" ] && [[ ! "$1" =~ ^(f=|o=) ]] && condition="WHERE ${1//=/ = }"
+                    ;;
+                f=*) fields="${1#f=}";;
+                o=*) order_limit="ORDER BY ${1#o=} LIMIT 10";;
+                *) condition="WHERE ${1//=/ = }";;
+            esac
+            shift
+        done
+    fi
+
+    # 添加 site_id 条件
+    local site_condition="${table}.site_id = ${SITE_ID}"
+    if [ -n "$join" ]; then
+        site_condition+=" AND ${join_table}.site_id = ${SITE_ID}"
+    fi
+    if [ -n "$condition" ]; then
+        condition="${condition/WHERE/WHERE $site_condition AND}"
+    else
+        condition="WHERE $site_condition"
+    fi
+
+    # 字段选择
+    local main_cols
+    [ -z "$fields" ] && main_cols=$(get_short_columns "$table") || main_cols="$fields"
+    local select_clause="SELECT ${table}.${main_cols}"
+    if [ -n "$join" ]; then
+        local join_cols=$(get_short_columns "$join_table")
+        select_clause+=", ${join_table}.${join_cols}"
+    fi
+
+    # 生成 SQL
+    sql="$select_clause FROM ${table} ${join} ${condition} ${order_limit};"
+    
+    # 输出
+    if [ "$verbose" -eq 1 ]; then
+        echo "查询: ${table}${join:+ + $alias}"
+        echo "字段: ${main_cols}${join:+, $join_cols}"
+        echo "SQL: $sql"
+    else
+        echo "查询: ${table}${join:+ + $alias}"
+    fi
+
+    # 执行查询
+    result=$(
+        MYSQL_PWD="$DB_PASSWORD" \
+        mysql -t -h"$DB_HOST" -u"$DB_USER" "$DB_NAME" -e "$sql" 2>/dev/null
+    )
+    [ -z "$result" ] && echo "无记录" || echo "$result"
+}
