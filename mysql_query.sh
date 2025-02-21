@@ -26,20 +26,17 @@ RELATED_TABLES=(
 )
 
 # -----------------------------
-# 环境变量：默认站点 ID
-# 可通过 export SITE_ID=xx 设置
-# -----------------------------
-: ${SITE_ID:=20}  # 默认值为 20，若未设置则使用此值
-
-# -----------------------------
 # 函数：查询指定表的数据
 # 用法示例：
-#   query s 123               # lc_ec_shop id=123 AND site_id=20
-#   query s n=test            # lc_ec_shop name='test' AND site_id=20
-#   query s j o s=1           # lc_ec_shop JOIN lc_ec_order WHERE status=1 AND site_id=20
-#   query s n=test d          # lc_ec_shop name='test' AND site_id=20 ORDER BY id DESC LIMIT 10
-#   query d                   # lc_member site_id=20 ORDER BY id DESC LIMIT 10
+#   query es 123               # lc_ec_shop id=123 AND site_id=20
+#   query es n=test            # lc_ec_shop name='test' AND site_id=20
+#   query es j o s=1           # lc_ec_shop JOIN lc_ec_order WHERE status=1 AND site_id=20
+#   query es n=test d          # lc_ec_shop name='test' AND site_id=20 ORDER BY id DESC LIMIT 10
+#   query es name=xx                   # lc_ec_shop site_id=20 and name="xx" ORDER BY id DESC LIMIT 10
+#   query name=xx                   # lc_member site_id=20 and name="xx" ORDER BY member_id(primary key) DESC LIMIT 10
+#   ...请补充更多强大, 又简单的命令
 # -----------------------------
+
 
 # 获取表的短字段
 get_short_columns() {
@@ -199,9 +196,13 @@ query() {
     local order_limit="LIMIT 10"
     local verbose=0
     local fields=""
+    local nowrap=1  # 是否禁用换行
 
-    # 检查调试模式
-    [ "$1" = "-v" ] && { verbose=1; shift; }
+    # 检查选项
+    while [[ "$1" =~ ^- ]]; do
+        [ "$1" = "-v" ] && { verbose=1; shift; }
+        [ "$1" = "-n" ] && { nowrap=1; shift; }  # -n 表示不换行
+    done
 
     # 单参数排序
     if [ "$#" -eq 1 ] && { [ "$1" = "d" ] || [ "$1" = "a" ]; }; then
@@ -270,10 +271,10 @@ query() {
 
     # 生成 SQL
     sql="$select_clause FROM ${table} ${join} ${condition} ${order_limit};"
-    
-    # 输出
+
+    # 输出调试信息
     if [ "$verbose" -eq 1 ]; then
-        echo "查询: ${table}${join:+ + $alias}"
+        echo "查询1: ${table}${join:+ + $alias}"
         echo "字段: ${main_cols}${join:+, $join_cols}"
         echo "SQL: $sql"
     else
@@ -281,9 +282,21 @@ query() {
     fi
 
     # 执行查询
-    result=$(
-        MYSQL_PWD="$DB_PASSWORD" \
-        mysql -t -h"$DB_HOST" -u"$DB_USER" "$DB_NAME" -e "$sql" 2>/dev/null
-    )
-    [ -z "$result" ] && echo "无记录" || echo "$result"
+    if [ "$nowrap" -eq 1 ]; then
+        # 禁用换行
+        tput rmam
+        result=$(
+            MYSQL_PWD="$DB_PASSWORD" \
+            mysql -t -h"$DB_HOST" -u"$DB_USER" "$DB_NAME" -e "$sql" 2>/dev/null
+        )
+        echo "$result"
+        # 恢复换行
+        tput smam
+    else
+        result=$(
+            MYSQL_PWD="$DB_PASSWORD" \
+            mysql -t -h"$DB_HOST" -u"$DB_USER" "$DB_NAME" -e "$sql" 2>/dev/null
+        )
+        [ -z "$result" ] && echo "无记录" || echo "$result"
+    fi
 }
