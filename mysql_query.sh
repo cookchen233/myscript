@@ -61,6 +61,12 @@ get_short_columns() {
 
 # 主查询函数
 query() {
+    # 无参数时进入交互模式
+    if [ $# -eq 0 ]; then
+        interactive_mode
+        return
+    fi
+
     local table="lc_member"
     local condition=""
     local join=""
@@ -212,14 +218,36 @@ query() {
     fi
 }
 
-# 获取所有表名（用于表名补全）
+# 获取所有表名（包含别名，用于表名补全）
 get_all_tables() {
-    MYSQL_PWD="$DB_PASSWORD" \
-    mysql -h"$DB_HOST" -u"$DB_USER" "$DB_NAME" -N -e "
-    SELECT TABLE_NAME
-    FROM INFORMATION_SCHEMA.TABLES
-    WHERE TABLE_SCHEMA = '$DB_NAME'
-    ORDER BY TABLE_NAME;" 2>/dev/null
+    local -a tables
+    # 添加预定义别名
+    for entry in "${TABLE_ALIAS[@]}"; do
+        local alias="${entry%%:*}"
+        local full_table="${entry##*:}"
+        tables+=("${alias} (${full_table})")
+    done
+    # 添加数据库中的其他表名
+    local db_tables=$(
+        MYSQL_PWD="$DB_PASSWORD" \
+        mysql -h"$DB_HOST" -u"$DB_USER" "$DB_NAME" -N -e "
+        SELECT TABLE_NAME
+        FROM INFORMATION_SCHEMA.TABLES
+        WHERE TABLE_SCHEMA = '$DB_NAME'
+        ORDER BY TABLE_NAME;" 2>/dev/null
+    )
+    for tbl in ${(f)db_tables}; do
+        local found=0
+        for entry in "${TABLE_ALIAS[@]}"; do
+            if [[ "${entry##*:}" == "$tbl" ]]; then
+                found=1
+                break
+            fi
+        done
+        [[ $found -eq 0 ]] && tables+=("$tbl")
+    done
+    # 逐行输出，确保 fzf 和补全正确解析
+    printf "%s\n" "${tables[@]}"
 }
 
 # 获取完整表名
@@ -263,8 +291,23 @@ _get_full_table_name() {
     fi
 }
 
-# 主逻辑：执行查询
-#query "$@"
+# 交互模式
+interactive_mode() {
+    echo "进入交互模式 (输入 'exit' 或 Ctrl+D 退出)"
+    local input
+    while true; do
+        input=""
+        print -n "query> "
+        # 使用 vared 保留 ZLE 的补全功能
+        if ! vared -c -p "query> " input; then
+            echo "\n退出交互模式"
+            break
+        fi
+        [[ "$input" == "exit" ]] && { echo "退出交互模式"; break; }
+        [[ -z "$input" ]] && continue
+        query ${(z)input}
+    done
+}
 
 # Zsh 补全与快捷键逻辑
 if [[ -n "$ZSH_NAME" ]]; then
@@ -274,7 +317,8 @@ if [[ -n "$ZSH_NAME" ]]; then
         local -a all_tables
         all_tables=($(get_all_tables))
         for tbl in "${all_tables[@]}"; do
-            TABLE_FIELDS[$tbl]=$(get_short_columns "$tbl" | tr ',' ' ')
+            local full_table=$(echo "$tbl" | sed 's/.*(\(.*\))/\1/' || echo "$tbl")
+            TABLE_FIELDS[$full_table]=$(get_short_columns "$full_table" | tr ',' ' ')
         done
     }
 
@@ -321,7 +365,8 @@ if [[ -n "$ZSH_NAME" ]]; then
         if [[ "$buffer" =~ "^query[ ]*$" ]]; then
             selected=$(get_all_tables | fzf --prompt="选择表名 > " --height=40% --border --query="")
             if [ -n "$selected" ]; then
-                LBUFFER="$buffer $selected"
+                local table_name=$(echo "$selected" | sed 's/ (\(.*\))//')
+                LBUFFER="$buffer $table_name"
                 zle reset-prompt
             else
                 LBUFFER="$buffer "
@@ -335,7 +380,8 @@ if [[ -n "$ZSH_NAME" ]]; then
         if [[ "$buffer" =~ "j[ ]*$" ]]; then
             selected=$(get_all_tables | fzf --prompt="选择 JOIN 表名 > " --height=40% --border --query="")
             if [ -n "$selected" ]; then
-                LBUFFER="$buffer $selected"
+                local table_name=$(echo "$selected" | sed 's/ (\(.*\))//')
+                LBUFFER="$buffer $table_name"
                 zle reset-prompt
             else
                 LBUFFER="$buffer "
@@ -400,7 +446,11 @@ if [[ -n "$ZSH_NAME" ]]; then
 
         case "$state" in
             tables)
-                _describe -t tables "表名" all_tables && return 0
+                local -a table_names
+                for t in "${all_tables[@]}"; do
+                    table_names+=($(echo "$t" | sed 's/ (\(.*\))//'))
+                done
+                _describe -t tables "表名" table_names && return 0
                 ;;
             params)
                 local -a options context_tables
@@ -410,7 +460,11 @@ if [[ -n "$ZSH_NAME" ]]; then
 
                 case "${words[$CURRENT-1]}" in
                     j)
-                        options=("${all_tables[@]/%/:JOIN 表}")
+                        local -a join_tables
+                        for t in "${all_tables[@]}"; do
+                            join_tables+=($(echo "$t" | sed 's/ (\(.*\))//'))
+                        done
+                        options=("${join_tables[@]/%/:JOIN 表}")
                         ;;
                     limit)
                         options=("20" "50" "100")
@@ -458,12 +512,13 @@ if [[ -n "$ZSH_NAME" ]]; then
             local selected
             selected=$(get_all_tables | fzf --prompt="选择表名 > " --height=40% --border --query="")
             if [[ -n "$selected" ]]; then
+                local table_name=$(echo "$selected" | sed 's/ (\(.*\))//')
                 if [[ "$buffer" =~ "query[ ]+[^ ]+[ ].*j$" ]]; then
-                    LBUFFER="$buffer $selected"
+                    LBUFFER="$buffer $table_name"
                 elif [[ "$buffer" == "query" ]]; then
-                    LBUFFER="query $selected"
+                    LBUFFER="query $table_name"
                 else
-                    LBUFFER="$buffer $selected"
+                    LBUFFER="$buffer $table_name"
                 fi
                 zle reset-prompt
             fi
@@ -472,5 +527,14 @@ if [[ -n "$ZSH_NAME" ]]; then
         bindkey '†' _query_fzf
         bindkey '\M-t' _query_fzf
         bindkey '\e[116;3u' _query_fzf
+    fi
+fi
+
+# 仅在脚本作为独立程序运行时检测参数
+if [[ "$0" == "$ZSH_SCRIPT" ]]; then
+    if [ $# -eq 0 ]; then
+        interactive_mode
+    else
+        query "$@"
     fi
 fi
