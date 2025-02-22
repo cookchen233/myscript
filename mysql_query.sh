@@ -9,9 +9,11 @@
 #   query es name=xx          # lc_ec_shop WHERE name='xx' AND site_id=20 ORDER BY id DESC LIMIT 20
 #   query es name=xx id asc   # lc_ec_shop WHERE name='xx' AND site_id=20 ORDER BY id ASC LIMIT 20
 #   query es j eo es.id=eo.shop_id  # lc_ec_shop JOIN lc_ec_order on lc_ec_order.shop_id=lc_ec_shop.id
+#   query+enter                 # 交互模式
+#   q                   # 简版命令
 # -----------------------------
 
-DB_HOST="118.25.213.19"
+DB_HOST="lc.db.host"
 DB_NAME="api_13012345822"
 DB_USER="waynechen"
 DB_PASSWORD="Cc@123456"
@@ -334,8 +336,9 @@ if [[ -n "$ZSH_NAME" ]]; then
         local -a tables
         tables=()
 
-        if [[ "$buffer" =~ "query ([^ ]+)" ]]; then
-            local main_input="${match[1]}"
+        # 支持 q 或 query 开头
+        if [[ "$buffer" =~ "^(query|q) ([^ ]+)" ]]; then
+            local main_input="${match[2]}"
             local main_full=$(_get_full_table_name "$main_input")
             local main_alias="$main_input"
             tables+=("$main_alias $main_full")
@@ -361,8 +364,8 @@ if [[ -n "$ZSH_NAME" ]]; then
         local buffer="$LBUFFER"
         local selected
 
-        # 情况 1：query 后提示表名
-        if [[ "$buffer" =~ "^query[ ]*$" ]]; then
+        # 情况 1：query 或 q 后提示表名
+        if [[ "$buffer" =~ "^(query|q)[ ]*$" ]]; then
             selected=$(get_all_tables | fzf --prompt="选择表名 > " --height=40% --border --query="")
             if [ -n "$selected" ]; then
                 local table_name=$(echo "$selected" | sed 's/ (\(.*\))//')
@@ -504,6 +507,7 @@ if [[ -n "$ZSH_NAME" ]]; then
     }
 
     compdef _query query
+    compdef _query q  # 为别名 q 添加补全
 
     # Option+T 触发表名选择
     if (( ${+commands[fzf]} )); then
@@ -513,10 +517,10 @@ if [[ -n "$ZSH_NAME" ]]; then
             selected=$(get_all_tables | fzf --prompt="选择表名 > " --height=40% --border --query="")
             if [[ -n "$selected" ]]; then
                 local table_name=$(echo "$selected" | sed 's/ (\(.*\))//')
-                if [[ "$buffer" =~ "query[ ]+[^ ]+[ ].*j$" ]]; then
+                if [[ "$buffer" =~ "(query|q)[ ]+[^ ]+[ ].*j$" ]]; then
                     LBUFFER="$buffer $table_name"
-                elif [[ "$buffer" == "query" ]]; then
-                    LBUFFER="query $table_name"
+                elif [[ "$buffer" =~ "^(query|q)$" ]]; then
+                    LBUFFER="$buffer $table_name"
                 else
                     LBUFFER="$buffer $table_name"
                 fi
