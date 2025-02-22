@@ -90,19 +90,21 @@ query() {
 
     # 处理表名和别名（确保第一个参数总是表名）
     if [ -n "$1" ]; then
+        local found=0
         for entry in "${TABLE_ALIAS[@]}"; do
             local alias="${entry%%:*}"
             local full_table="${entry##*:}"
             if [ "$1" = "$alias" ]; then
                 table="$full_table"
                 main_alias="$alias"
+                found=1
                 shift
                 break
             fi
         done
-        if [ "$table" = "lc_member" ]; then
+        if [ $found -eq 0 ]; then
             table="lc_$1"
-            table=${table/lc_lc_/lc_}
+            table=${table/lc_lc_/lc_}  # 防止重复前缀
             main_alias="$1"
             shift
         fi
@@ -116,6 +118,7 @@ query() {
     # 如果 main_alias 仍为空，使用表名作为默认别名（去掉 lc_ 前缀）
     [ -z "$main_alias" ] && main_alias="${table#lc_}"
 
+    # 获取主键
     primary_key=$(
         MYSQL_PWD="$DB_PASSWORD" \
         mysql -h"$DB_HOST" -u"$DB_USER" "$DB_NAME" -N -e "
@@ -128,6 +131,7 @@ query() {
     )
     [ -z "$primary_key" ] && primary_key="id"
 
+    # 处理剩余参数
     while [ -n "$1" ]; do
         case "$1" in
             [0-9]*) condition="${primary_key} = '$1'"; shift;;
@@ -165,7 +169,8 @@ query() {
                 ;;
             where)
                 shift
-                if [ -n "$1" ] && [[ ! "$1" =~ (limit|desc|asc) ]]; then
+                [ -z "$1" ] && { echo "缺少 WHERE 条件"; return 1; }
+                if [[ ! "$1" =~ (limit|desc|asc) ]]; then
                     condition="${condition:+$condition AND }$1"
                     shift
                 fi
@@ -184,11 +189,19 @@ query() {
 
     local main_cols
     [ -z "$fields" ] && main_cols=$(get_short_columns "$table") || main_cols="$fields"
+    if [ -z "$main_cols" ]; then
+        echo "无法获取表 $table 的字段列表"
+        return 1
+    fi
     main_cols=$(echo "$main_cols" | awk -F',' -v alias="$main_alias" '{for(i=1;i<=NF;i++) printf "%s%s.%s", (i>1?",":""), alias, $i}')
 
     local select_clause="SELECT ${main_cols}"
     if [ -n "$join" ]; then
         local join_cols=$(get_short_columns "$join_table")
+        if [ -z "$join_cols" ]; then
+            echo "无法获取表 $join_table 的字段列表"
+            return 1
+        fi
         join_cols=$(echo "$join_cols" | awk -F',' -v alias="$join_alias" '{for(i=1;i<=NF;i++) printf "%s%s.%s", (i>1?",":""), alias, $i}')
         select_clause+=", ${join_cols}"
     fi
