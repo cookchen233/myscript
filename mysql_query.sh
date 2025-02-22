@@ -308,7 +308,6 @@ if [[ -n "$ZSH_NAME" ]]; then
         echo "${tables[*]}"
     }
 
-    # 修改：空格触发表名或字段提示
     _query_field_fzf() {
         if ! (( ${+commands[fzf]} )); then
             zle self-insert
@@ -324,7 +323,11 @@ if [[ -n "$ZSH_NAME" ]]; then
             if [ -n "$selected" ]; then
                 LBUFFER="$buffer $selected"
                 zle reset-prompt
+            else
+                LBUFFER="$buffer "
+                zle reset-prompt
             fi
+            tput cnorm  # 恢复光标
             return
         fi
 
@@ -334,7 +337,11 @@ if [[ -n "$ZSH_NAME" ]]; then
             if [ -n "$selected" ]; then
                 LBUFFER="$buffer $selected"
                 zle reset-prompt
+            else
+                LBUFFER="$buffer "
+                zle reset-prompt
             fi
+            tput cnorm  # 恢复光标
             return
         fi
 
@@ -365,11 +372,13 @@ if [[ -n "$ZSH_NAME" ]]; then
 
         selected=$(printf "%s\n" "${all_fields[@]}" | fzf --prompt="选择字段 > " --height=40% --border --query="")
         if [ -n "$selected" ]; then
-            LBUFFER="$buffer $selected"  # 保留空格
+            LBUFFER="$buffer $selected"
             zle reset-prompt
         else
-            zle self-insert
+            LBUFFER="$buffer "
+            zle reset-prompt
         fi
+        tput cnorm  # 恢复光标
     }
 
     # 绑定空格键

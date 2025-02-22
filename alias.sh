@@ -97,6 +97,9 @@ alias q=query
 apilog() {
     TODAY=$(date +%d); MONTH=$(date +%Y%m); /usr/bin/scp root@118.25.213.19:/www/wwwroot/api.13012345822.com/runtime/api/log/${MONTH}/${TODAY}.log ~/Downloads/ && /usr/bin/open -a '/Applications/Visual Studio Code.app' ~/Downloads/${TODAY}.log
 }
-consolelog() {
+conslog() {
     TODAY=$(date +%d); MONTH=$(date +%Y%m); /usr/bin/scp root@118.25.213.19:/www/wwwroot/api.13012345822.com/runtime/log/${MONTH}/${TODAY}.log ~/Downloads/ && /usr/bin/open -a '/Applications/Visual Studio Code.app' ~/Downloads/${TODAY}.log
+}
+reqlog() {
+    TODAY=$(date +%d); MONTH=$(date +%Y%m); /usr/bin/scp root@118.25.213.19:/www/wwwroot/api.13012345822.com/runtime/log/request/${MONTH}/${TODAY}.log ~/Downloads/ && /usr/bin/open -a '/Applications/Visual Studio Code.app' ~/Downloads/${TODAY}.log
 }
