@@ -262,12 +262,11 @@ query() {
                 local group_sql="SELECT $group_fields FROM ${table} ${main_alias} ${join} WHERE ${condition} ${order_by} ${limit};"
 
                 if [ "$verbose" -eq 1 ]; then
-                    echo "分批查询 ($group_index/$num_groups):"
+                    echo "Query in batches ($group_index/$num_groups):"
                     echo "$group_sql"
                 fi
 
                 # 执行并显示当前组的结果
-                echo "\n=== 第 $group_index 部分字段（共 $num_groups 部分）==="
                 MYSQL_PWD="$DB_PASSWORD" mysql -t -h"$DB_HOST" -u"$DB_USER" "$DB_NAME" -e "$group_sql"
 
                 group_index=$((group_index + 1))
