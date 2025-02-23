@@ -234,7 +234,7 @@ query() {
             local total_fields=$(echo "$all_fields" | tr ',' '\n' | wc -l)
 
             # 预设每个字段的最大宽度（包括分隔符和边框）
-            local max_field_width=15
+            local max_field_width=16
 
             # 计算每行能容纳的字段数（考虑表格边框和分隔符，留一些余量）
             local fields_per_row=$(( (terminal_width - 2) / max_field_width ))
