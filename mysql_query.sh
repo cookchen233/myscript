@@ -13,13 +13,6 @@
 #   q                   # 简版命令
 # -----------------------------
 
-DB_HOST="lc.db.host"
-DB_NAME="api_13012345822"
-DB_USER="waynechen"
-DB_PASSWORD="Cc@123456"
-
-: ${site:=20}
-
 TABLE_ALIAS=(
     "m:lc_member"
     "mt:lc_member_token"
@@ -76,14 +69,14 @@ query() {
     local limit="LIMIT 20"
     local verbose=1
     local fields=""
-    local nowrap=1
+    local wrap=0
     local primary_key="id"
     local main_alias=""
 
     while [[ "$1" =~ ^- ]]; do
         case "$1" in
             -v) verbose=1; shift;;
-            -n) nowrap=1; shift;;
+            -w) wrap=1; shift;;
             *) echo "未知选项: $1"; return 1;;
         esac
     done
@@ -223,10 +216,18 @@ query() {
     elif [ -z "$result" ]; then
         echo "无记录"
     else
-        if [ "$nowrap" -eq 1 ]; then
+        if [ "$wrap" -eq 0 ]; then
+            terminal_width=$(tput cols)
+            max_line_length=$(echo "$result" | awk '{ print length }' | sort -rn | head -1)
+
             tput rmam
-            echo "$result"
+            if [ "$max_line_length" -gt "$terminal_width" ]; then
+                echo -e "$result" | less -S 
+            else
+                echo -e "$result"
+            fi
             tput smam
+
         else
             echo "$result"
         fi
@@ -483,7 +484,7 @@ if [[ -n "$ZSH_NAME" ]]; then
                         options=("${join_tables[@]/%/:JOIN 表}")
                         ;;
                     limit)
-                        options=("20" "50" "100")
+                        options=("20" "100" "200")
                         ;;
                     *=*)
                         local -a fields
@@ -544,6 +545,8 @@ if [[ -n "$ZSH_NAME" ]]; then
         bindkey '†' _query_fzf
         bindkey '\M-t' _query_fzf
         bindkey '\e[116;3u' _query_fzf
+        zle -N _query_fzf
+        bindkey '^[OS' _query_fzf     # F4 for iTerm2
     fi
 fi
 

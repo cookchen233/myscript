@@ -1,15 +1,10 @@
 #!/usr/bin/env bash
 
-DB_HOST="118.25.213.19"
-DB_NAME="api_13012345822"
-DB_USER="waynechen"
-DB_PASSWORD="Cc@123456"
-
-# 默认站点 ID
-: ${SITE_ID:=20}
-
 # 相关联表（别名:表名）
 RELATED_TABLES=(
+    "res:lc_bb_reseller"
+    "resc:lc_bb_reseller_commission"
+    "m:lc_member"
     "mt:lc_member_token"
     "mw:lc_member_weixin"
     "eo:lc_ec_order"
@@ -68,9 +63,9 @@ ${union_query};
 EOF
     )
 
-    echo "原始查询结果："
-    echo "$orphans"
-    echo "结果长度：${#orphans}"
+    # echo "原始查询结果："
+    # echo "$orphans"
+    # echo "结果长度：${#orphans}"
 
     # 如果结果太短，可能意味着没有找到孤儿记录
     if [ -z "$orphans" ] || [ "${#orphans}" -lt 10 ]; then

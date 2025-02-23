@@ -54,7 +54,7 @@ alias cc='git checkout -- . && git clean -fd'
 alias ss='[ -f "vite.config.js" ] && { yarn build && ~/Coding/myscript/sy/syp.sh master all; } || ~/Coding/myscript/sy/syp.sh master'
 alias bb='pnpm build:h5 && rsync -avzuP  /Users/Chen/Coding/bbv2-uniapp/dist/build/h5/*  root@118.25.213.19:/www/wwwroot/www.13012345822.com/public/bbv2/'
 alias bb2='pnpm build:h5 && rsync -avzuP  /Users/Chen/Coding/bbv2-uniapp/dist/build/h5/*  root@118.25.213.19:/www/wwwroot/www.yifanglvyou.com/public/bbv2/'
-alias ss19='ssh root@118.25.213.19 -t "tmux attach || tmux"'
+alias sslc='ssh root@118.25.213.19 -t "tmux attach || tmux"'
 
 alias lf='function _logwatch() { ssh root@118.25.213.19 "tail -F $1"; }; _logwatch'
 # 带 lnav 的版本
@@ -88,6 +88,35 @@ p {
 }'
 }
 
+# 在 按键值
+print_keys() {
+    local k
+    read -sk k
+    printf "Key pressed: "
+    printf '%d ' "'$k"
+    printf '\n'
+}
+
+# 按键值2
+test_key() {
+    local key
+    echo "按下要测试的键 (按 Ctrl+C 退出)..."
+    while true; do
+        read -sk key
+        printf "键码: "
+        for i in $(printf %s "$key" | od -An -tx1); do 
+            printf '%s ' "$i"
+        done
+        printf '\n'
+    done
+}
+
+
+DB_HOST="lc.db.host"
+DB_NAME="api_13012345822"
+DB_USER="waynechen"
+DB_PASSWORD="Cc@123456"
+: ${site:=20}
 source ~/Coding/myscript/mysql_query.sh
 source ~/Coding/myscript/clean_orphans.sh
 alias dm=delete_member_and_related
