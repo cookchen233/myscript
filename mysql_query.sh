@@ -3,11 +3,11 @@
 # -----------------------------
 # 函数：查询指定表的数据
 # 用法示例：
-#   query 1                   # ...lc_member WHERE member_id(primary key)=1 AND site_id=20
-#   query name=xx             # lc_member WHERE name="xx" AND site_id=20 ORDER BY member_id DESC LIMIT 20
-#   query es 123              # lc_ec_shop WHERE id=123 AND site_id=20
-#   query es name=xx          # lc_ec_shop WHERE name='xx' AND site_id=20 ORDER BY id DESC LIMIT 20
-#   query es name=xx id asc   # lc_ec_shop WHERE name='xx' AND site_id=20 ORDER BY id ASC LIMIT 20
+#   query 1                   # ...lc_member WHERE member_id(primary key)=1 AND site_id=15
+#   query name=xx             # lc_member WHERE name="xx" AND site_id=15 ORDER BY member_id DESC LIMIT 15
+#   query es 123              # lc_ec_shop WHERE id=123 AND site_id=15
+#   query es name=xx          # lc_ec_shop WHERE name='xx' AND site_id=15 ORDER BY id DESC LIMIT 15
+#   query es name=xx id asc   # lc_ec_shop WHERE name='xx' AND site_id=15 ORDER BY id ASC LIMIT 15
 #   query es j eo es.id=eo.shop_id  # lc_ec_shop JOIN lc_ec_order on lc_ec_order.shop_id=lc_ec_shop.id
 #   query+enter                 # 交互模式
 #   q                   # 简版命令
@@ -66,7 +66,7 @@ query() {
     local condition=""
     local join=""
     local order_by=""
-    local limit="LIMIT 20"
+    local limit="LIMIT 15"
     local verbose=1
     local fields=""
     local wrap=0
@@ -152,7 +152,7 @@ query() {
                     join_alias="$1"
                     shift
                 fi
-                if [ -n "$1" ] && [[ ! "$1" =~ (where|limit|desc|asc) ]]; then
+                if [ -n "$1" ] && [[ ! "$1" =~ (where|limit|asc|desc) ]]; then
                     local join_condition="$1"
                     join="LEFT JOIN ${join_table} ${join_alias} ON ${join_condition}"
                     shift
@@ -207,29 +207,80 @@ query() {
         echo "SQL: \n$sql"
     fi
 
-    local result
-    result=$(MYSQL_PWD="$DB_PASSWORD" \
+    local test_result=$(MYSQL_PWD="$DB_PASSWORD" \
         mysql -t -h"$DB_HOST" -u"$DB_USER" "$DB_NAME" -e "$sql" 2>&1)
 
-    if [[ "$result" =~ "ERROR" ]]; then
-        echo "查询失败: $result"
-    elif [ -z "$result" ]; then
+    if [[ "$test_result" =~ "ERROR" ]]; then
+        echo "查询失败: $test_result"
+    elif [ -z "$test_result" ]; then
         echo "无记录"
     else
-        if [ "$wrap" -eq 0 ]; then
-            terminal_width=$(tput cols)
-            max_line_length=$(echo "$result" | awk '{ print length }' | sort -rn | head -1)
+        # 获取终端宽度
+        local terminal_width=$(tput cols)
 
-            tput rmam
-            if [ "$max_line_length" -gt "$terminal_width" ]; then
-                echo -e "$result" | less -S 
+        # 检查结果是否会超出终端宽度
+        local max_line_length=$(echo "$test_result" | awk '{ print length }' | sort -rn | head -1)
+
+        if [ "$max_line_length" -gt "$terminal_width" ]; then
+            # 获取所有字段
+            local all_fields=""
+            if [ -n "$join" ]; then
+                all_fields="${main_cols},${join_cols}"
             else
-                echo -e "$result"
+                all_fields="$main_cols"
             fi
-            tput smam
 
+            # 计算字段总数
+            local total_fields=$(echo "$all_fields" | tr ',' '\n' | wc -l)
+
+            # 预设每个字段的最大宽度（包括分隔符和边框）
+            local max_field_width=15
+
+            # 计算每行能容纳的字段数（考虑表格边框和分隔符，留一些余量）
+            local fields_per_row=$(( (terminal_width - 2) / max_field_width ))
+
+            # 如果计算结果小于 1，则至少显示 1 个字段
+            [ "$fields_per_row" -lt 1 ] && fields_per_row=1
+
+            # 计算需要分几组
+            local num_groups=$(( (total_fields + fields_per_row - 1) / fields_per_row ))
+
+            # 分割字段并执行查询
+            local field_list=$(echo "$all_fields" | tr ',' '\n')
+            local group_index=1
+
+            while [ $group_index -le $num_groups ]; do
+                # 计算当前组的字段范围
+                local start=$(( (group_index - 1) * fields_per_row + 1 ))
+                local end=$(( group_index * fields_per_row ))
+                [ $end -gt $total_fields ] && end=$total_fields
+
+                # 提取当前组的字段
+                local group_fields=$(echo "$field_list" | sed -n "${start},${end}p" | tr '\n' ',' | sed 's/,$//')
+
+                # 构造当前组的查询
+                local group_sql="SELECT $group_fields FROM ${table} ${main_alias} ${join} WHERE ${condition} ${order_by} ${limit};"
+
+                if [ "$verbose" -eq 1 ]; then
+                    echo "分批查询 ($group_index/$num_groups):"
+                    echo "$group_sql"
+                fi
+
+                # 执行并显示当前组的结果
+                echo "\n=== 第 $group_index 部分字段（共 $num_groups 部分）==="
+                MYSQL_PWD="$DB_PASSWORD" mysql -t -h"$DB_HOST" -u"$DB_USER" "$DB_NAME" -e "$group_sql"
+
+                group_index=$((group_index + 1))
+            done
         else
-            echo "$result"
+            # 如果不需要分批，直接显示结果
+            if [ "$wrap" -eq 0 ]; then
+                tput rmam
+                echo -e "$test_result"
+                tput smam
+            else
+                echo -e "$test_result"
+            fi
         fi
     fi
 }
@@ -484,7 +535,7 @@ if [[ -n "$ZSH_NAME" ]]; then
                         options=("${join_tables[@]/%/:JOIN 表}")
                         ;;
                     limit)
-                        options=("20" "100" "200")
+                        options=("15" "50" "100")
                         ;;
                     *=*)
                         local -a fields
