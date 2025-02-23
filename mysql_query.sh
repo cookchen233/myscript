@@ -267,7 +267,13 @@ query() {
                 fi
 
                 # 执行并显示当前组的结果
-                MYSQL_PWD="$DB_PASSWORD" mysql -t -h"$DB_HOST" -u"$DB_USER" "$DB_NAME" -e "$group_sql"
+                if [ "$wrap" -eq 0 ]; then
+                    tput rmam
+                    MYSQL_PWD="$DB_PASSWORD" mysql -t -h"$DB_HOST" -u"$DB_USER" "$DB_NAME" -e "$group_sql"
+                    tput smam
+                else
+                    MYSQL_PWD="$DB_PASSWORD" mysql -t -h"$DB_HOST" -u"$DB_USER" "$DB_NAME" -e "$group_sql"
+                fi
 
                 group_index=$((group_index + 1))
             done

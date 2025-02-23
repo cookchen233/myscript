@@ -4,7 +4,6 @@
 RELATED_TABLES=(
     "res:lc_bb_reseller"
     "resc:lc_bb_reseller_commission"
-    "m:lc_member"
     "mt:lc_member_token"
     "mw:lc_member_weixin"
     "eo:lc_ec_order"
@@ -76,7 +75,9 @@ EOF
 
     echo
     echo "找到以下孤儿记录：（表别名 | member_id）"
+    tput rmam
     echo "$orphans"
+    tput smam
     echo
 
     # 交互式删除
@@ -140,7 +141,7 @@ delete_member_and_related() {
     for table_entry in "${RELATED_TABLES[@]}"; do
         alias="${table_entry%%:*}"
         table="${table_entry##*:}"
-        select_clause+="${alias}.member_id AS ${alias}_member_id, "
+        select_clause+="${alias}.member_id AS ${table}, "
         join_clause+="LEFT JOIN ${table} ${alias} ON ${alias}.member_id = m.member_id
 "
     done
@@ -164,7 +165,9 @@ EOF
 
     echo
     echo "找到以下相关记录："
+    tput rmam
     echo "$related"
+    tput smam
     echo
 
     # 交互式删除确认
