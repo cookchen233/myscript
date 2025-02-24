@@ -68,56 +68,38 @@ ss() {
 
 # 配合快捷键并显示通知
 ssn() {
-    # 日志文件路径（无论成功失败都保留）
-    log_file="$HOME/Coding/ss_log_$(date +%Y%m%d_%H%M%S).txt"
-    status_file="$HOME/Coding/ss_status.txt"
-    rm -f "$status_file"  # 只清理状态文件，日志文件保留
+    local date_folder="$HOME/Coding/logs/$(date +%Y%m%d)"
+    mkdir -p "$date_folder"
 
-    # 立即显示开始执行的通知
+    local log_file="$date_folder/ss_log_$(date +%Y%m%d_%H%M%S).log"
+    local status_file="$HOME/Coding/ss_status.txt"
+    rm -f "$status_file"
+
+    # 开始执行通知
     osascript <<EOF
-    display notification "Starting build and deploy" with title "myscript" subtitle "⏳ ss in progress" sound name "Frog"
+    display notification "Starting build and deploy" with title "myscript" subtitle "⏳ ss in progress" sound name "Glass"
 EOF
 
-    # 直接在当前 shell 中执行命令，捕获完整输出
-    (
-        ss "$1" > "$log_file" 2>&1 && echo 0 > "$status_file" || echo 1 > "$status_file"
-    )
-
-    # 检查状态的函数
-    check_status() {
-        for i in {1..10}; do  # 最多等待10秒
-            if [ -f "$status_file" ]; then
-                local status=$(cat "$status_file")
-                rm -f "$status_file"  # 清理状态文件
-                return "$status"
-            fi
-            sleep 1
-        done
-        # 如果超时，记录到日志并返回失败
-        echo "Timeout: ss did not complete within 10 seconds" >> "$log_file"
-        return 1
-    }
-
-    # 检查执行结果并显示通知
-    check_status
-    status=$?
-    if [ "$status" -eq 0 ]; then
+    # 执行命令并记录日志
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting deploy" > "$log_file"
+    if ss "$1" >> "$log_file" 2>&1; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Deploy succeeded" >> "$log_file"
+        # 成功通知
         osascript <<EOF
-        display notification "Build and deploy completed. Log: $log_file" with title "myscript" subtitle "✅ ss complete" sound name "Frog"
+        display notification "Build and deploy completed. Log: $log_file" with title "myscript" subtitle "✅ ss complete" sound name "Hero"
 EOF
         exit 0
     else
-        # 读取错误信息的第一行作为简要提示
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Deploy failed" >> "$log_file"
+        # 读取错误信息
         local error_msg
-        if [ -f "$log_file" ]; then
-            error_msg=$(head -n 1 "$log_file")
-        else
-            error_msg="Unknown error occurred"
-        fi
+        error_msg=$(grep -v "^\[" "$log_file" | head -n 1)
+        [ -z "$error_msg" ] && error_msg="Unknown error occurred"
+        # 失败通知
         osascript <<EOF
-        display notification "Build or deploy failed: $error_msg. Log: $log_file" with title "myscript" subtitle "❗️ ss failed" sound name "Frog"
+        display notification "Build or deploy failed: $error_msg. Log: $log_file" with title "myscript" subtitle "❗️ ss failed" sound name "Sosumi"
 EOF
-        open -a TextEdit "$log_file"  # 失败时使用 TextEdit 打开日志
+        open -a "Console" "$log_file"
         exit 1
     fi
 }
