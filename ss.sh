@@ -1,4 +1,6 @@
-#!/bin/bash
+#!/bin/zsh
+export PATH="/opt/homebrew/bin:$PATH"
+export PATH="/Users/Chen/.nvm/versions/node/v22.11.0/bin:$PATH"
 
 # 获取 vite.config.ts 中的 base 路径
 bbpath() {
@@ -37,7 +39,7 @@ bbyif() {
 # 根据项目类型执行构建和部署
 ss() {
     if [ -f "vite.config.ts" ]; then
-        if ! bb; then
+        if ! bb "$@"; then
             echo "bb failed" >&2
             return 1
         fi
@@ -54,12 +56,12 @@ ss() {
             echo "Yarn build failed" >&2
             return 1
         fi
-        if ! ~/Coding/myscript/sy/syp.sh master all; then
+        if ! ~/Coding/myscript/sy/syp.sh master all "$@"; then  # 替换 master all 为 master "$@"
             echo "syp.sh failed" >&2
             return 1
         fi
     else
-        if ! ~/Coding/myscript/sy/syp.sh master; then
+        if ! ~/Coding/myscript/sy/syp.sh master "$@"; then  # 替换 master 为 master "$@"
             echo "syp.sh failed" >&2
             return 1
         fi
@@ -82,7 +84,7 @@ EOF
 
     # 开始执行通知
     osascript <<EOF
-    display notification "Starting build and deploy" with title "myscript" subtitle "⏳ ss in progress" sound name "Glass"
+    display notification "Starting build and deploy" with title "myscript" subtitle "⏳ ss in progress" sound name "Funk"
 EOF
 
     # 执行命令并记录日志
@@ -102,7 +104,7 @@ EOF
         [ -z "$error_msg" ] && error_msg="Unknown error occurred"
         # 失败通知
         osascript <<EOF
-        display notification "Build or deploy failed: $error_msg. Log: $log_file" with title "myscript" subtitle "❗️ ss failed" sound name "Sosumi"
+        display notification "Build or deploy failed: $error_msg. Log: $log_file" with title "myscript" subtitle "❗️ ss failed" sound name "Ping"
 EOF
         open -a "Console" "$log_file"
         exit 1
