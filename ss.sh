@@ -73,18 +73,10 @@ ssn() {
 
     local log_file="$date_folder/ss_log_$(date +%Y%m%d_%H%M%S).log"
 
-    # 保存所有文件（针对 IntelliJ IDEA）
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Saving all files in IntelliJ IDEA" > "$log_file"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Saving files with Cmd + S" > "$log_file"
     osascript <<EOF >> "$log_file" 2>&1
     tell application "System Events"
-        tell process "IntelliJ IDEA"
-            if frontmost then
-                keystroke "s" using {command down}
-            else
-                display notification "IntelliJ IDEA is not in focus" with title "myscript" subtitle "⚠️ Save skipped"
-                return "IDEA not focused, skipping save"
-            end if
-        end tell
+        keystroke "s" using {command down}
     end tell
 EOF
 
