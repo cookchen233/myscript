@@ -14,6 +14,7 @@ def main():
     parser.add_argument('paths', nargs='+', help='格式: module_name/table_name，例如: admin/user admin/role ...')
     parser.add_argument('--dto', action='store_true', help='仅生成DTO文件')
     parser.add_argument('--model', action='store_true', help='仅生成Model文件')
+    parser.add_argument('--enum', action='store_true', help='仅生成Enum文件')
     parser.add_argument('--comment', help='类注释 (仅用于DTO)')
     parser.add_argument('--properties', help='属性定义 (仅用于DTO)')
     parser.add_argument('--force', '-f', action='store_true', help='强制覆盖已存在的文件')
@@ -36,6 +37,9 @@ def main():
     elif args.model:
         for path in args.paths:
             generator.generate_model(path)
+    elif args.enum:
+        for path in args.paths:
+            generator.generate_enum(path)
     else:
         for path in args.paths:
             generator.generate_all(path)

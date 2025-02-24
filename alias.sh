@@ -14,7 +14,7 @@ bg_blue="\033[44m"
 bg_purple="\033[45m"
 bg_cyan="\033[46m"
 bg_white="\033[47m"
-    
+
 fg_black="\033[30m"
 fg_red="\033[31m"
 fg_green="\033[32m"
@@ -23,17 +23,18 @@ fg_blue="\033[34m"
 fg_purple="\033[35m"
 fg_cyan="\033[36m"
 fg_white="\033[37m"
-    
+
 set_clear="\033[0m"
 set_bold="\033[1m"
 set_underline="\033[4m"
 set_flash="\033[5m"
 
 alias v='open -a /Applications/Visual\ Studio\ Code.app'
-alias s="cd ~/Coding/myscript"
-alias c="cd ~/Coding"
-alias d="cd ~/Downloads"
-alias del="trash"
+alias sc="cd ~/Coding/myscript"
+alias co="cd ~/Coding"
+alias dn="cd ~/Downloads"
+alias rr="trash"
+alias rm="echo 'Please use rr instead of rm';false"
 alias vs="networksetup -showpppoestatus Atlantic"
 alias vd="networksetup -disconnectpppoeservice 'Atlantic'"
 alias vv="~/Coding/myscript/connect_to_vpn.sh"
@@ -51,14 +52,15 @@ alias genm='~/Coding/myscript/genmenu.sh'
 alias py='python3'
 alias qr='qrencode -t ANSIUTF8'
 alias cc='git checkout -- . && git clean -fd'
-alias ss='[ -f "vite.config.js" ] && { yarn build && ~/Coding/myscript/sy/syp.sh master all; } || ~/Coding/myscript/sy/syp.sh master'
-alias bb='pnpm build:h5 && rsync -avzuP  /Users/Chen/Coding/bbv2-uniapp/dist/build/h5/*  root@118.25.213.19:/www/wwwroot/www.13012345822.com/public/bbv2/'
-alias bb2='pnpm build:h5 && rsync -avzuP  /Users/Chen/Coding/bbv2-uniapp/dist/build/h5/*  root@118.25.213.19:/www/wwwroot/www.yifanglvyou.com/public/bbv2/'
-alias sslc='ssh root@118.25.213.19 -t "tmux attach || tmux"'
 
-alias lf='function _logwatch() { ssh root@118.25.213.19 "tail -F $1"; }; _logwatch'
+alias sslc='ssh root@lc.server.host -t "tmux attach || tmux"'
+
+source ~/Coding/myscript/ss.sh
+# uniapp通常有vite.config.ts, 后台管理系统只有vite.config.js
+
+alias lf='function _logwatch() { ssh root@lc.server.host "tail -F $1"; }; _logwatch'
 # 带 lnav 的版本
-alias lnf='function _logwatch() { ssh root@118.25.213.19 "tail -F $1" | lnav; }; _logwatch'
+alias lnf='function _logwatch() { ssh root@lc.server.host "tail -F $1" | lnav; }; _logwatch'
 
 
 
@@ -104,31 +106,30 @@ test_key() {
     while true; do
         read -sk key
         printf "键码: "
-        for i in $(printf %s "$key" | od -An -tx1); do 
+        for i in $(printf %s "$key" | od -An -tx1); do
             printf '%s ' "$i"
         done
         printf '\n'
     done
 }
 
-
-DB_HOST="lc.db.host"
-DB_NAME="api_13012345822"
-DB_USER="waynechen"
-DB_PASSWORD="Cc@123456"
 : ${site:=20}
 source ~/Coding/myscript/mysql_query.sh
 source ~/Coding/myscript/clean_orphans.sh
 alias dm=delete_member_and_related
 alias dmcc=check_and_clean_orphans
 alias q=query
+qm() {
+    [ -n "$1" ] && site="$1"
+    site="$site" q m
+}
 
 apilog() {
-    TODAY=$(date +%d); MONTH=$(date +%Y%m); /usr/bin/scp root@118.25.213.19:/www/wwwroot/api.13012345822.com/runtime/api/log/${MONTH}/${TODAY}.log ~/Downloads/ && /usr/bin/open -a '/Applications/Visual Studio Code.app' ~/Downloads/${TODAY}.log
+    TODAY=$(date +%d); MONTH=$(date +%Y%m); /usr/bin/scp root@lc.server.host:/www/wwwroot/api.13012345822.com/runtime/api/log/${MONTH}/${TODAY}.log ~/Downloads/ && /usr/bin/open -a '/Applications/Visual Studio Code.app' ~/Downloads/${TODAY}.log
 }
 conslog() {
-    TODAY=$(date +%d); MONTH=$(date +%Y%m); /usr/bin/scp root@118.25.213.19:/www/wwwroot/api.13012345822.com/runtime/log/${MONTH}/${TODAY}.log ~/Downloads/ && /usr/bin/open -a '/Applications/Visual Studio Code.app' ~/Downloads/${TODAY}.log
+    TODAY=$(date +%d); MONTH=$(date +%Y%m); /usr/bin/scp root@lc.server.host:/www/wwwroot/api.13012345822.com/runtime/log/${MONTH}/${TODAY}.log ~/Downloads/ && /usr/bin/open -a '/Applications/Visual Studio Code.app' ~/Downloads/${TODAY}.log
 }
 reqlog() {
-    TODAY=$(date +%d); MONTH=$(date +%Y%m); /usr/bin/scp root@118.25.213.19:/www/wwwroot/api.13012345822.com/runtime/log/request/${MONTH}/${TODAY}.log ~/Downloads/ && /usr/bin/open -a '/Applications/Visual Studio Code.app' ~/Downloads/${TODAY}.log
+    TODAY=$(date +%d); MONTH=$(date +%Y%m); /usr/bin/scp root@lc.server.host:/www/wwwroot/api.13012345822.com/runtime/log/request/${MONTH}/${TODAY}.log ~/Downloads/ && /usr/bin/open -a '/Applications/Visual Studio Code.app' ~/Downloads/${TODAY}.log
 }
