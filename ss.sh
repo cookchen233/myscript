@@ -72,8 +72,21 @@ ssn() {
     mkdir -p "$date_folder"
 
     local log_file="$date_folder/ss_log_$(date +%Y%m%d_%H%M%S).log"
-    local status_file="$HOME/Coding/ss_status.txt"
-    rm -f "$status_file"
+
+    # 保存所有文件（针对 IntelliJ IDEA）
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Saving all files in IntelliJ IDEA" > "$log_file"
+    osascript <<EOF >> "$log_file" 2>&1
+    tell application "System Events"
+        tell process "IntelliJ IDEA"
+            if frontmost then
+                keystroke "s" using {command down}
+            else
+                display notification "IntelliJ IDEA is not in focus" with title "myscript" subtitle "⚠️ Save skipped"
+                return "IDEA not focused, skipping save"
+            end if
+        end tell
+    end tell
+EOF
 
     # 开始执行通知
     osascript <<EOF
@@ -81,12 +94,12 @@ ssn() {
 EOF
 
     # 执行命令并记录日志
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting deploy" > "$log_file"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting deploy" >> "$log_file"
     if ss "$1" >> "$log_file" 2>&1; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Deploy succeeded" >> "$log_file"
         # 成功通知
         osascript <<EOF
-        display notification "Build and deploy completed. Log: $log_file" with title "myscript" subtitle "✅ ss complete" sound name "Hero"
+        display notification "Deploy completed. Log: $log_file" with title "myscript" subtitle "✅ ss complete" sound name "Hero"
 EOF
         exit 0
     else
