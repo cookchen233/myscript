@@ -133,3 +133,6 @@ conslog() {
 reqlog() {
     TODAY=$(date +%d); MONTH=$(date +%Y%m); /usr/bin/scp root@lc.server.host:/www/wwwroot/api.13012345822.com/runtime/log/request/${MONTH}/${TODAY}.log ~/Downloads/ && /usr/bin/open -a '/Applications/Visual Studio Code.app' ~/Downloads/${TODAY}.log
 }
+admlog() {
+    TODAY=$(date +%d); MONTH=$(date +%Y%m); /usr/bin/scp root@lc.server.host:/www/wwwroot/api.13012345822.com/runtime/admin/log/${MONTH}/${TODAY}.log ~/Downloads/ && /usr/bin/open -a '/Applications/Visual Studio Code.app' ~/Downloads/${TODAY}.log
+}

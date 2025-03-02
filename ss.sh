@@ -48,6 +48,7 @@ ss() {
             echo "Git fetch failed" >&2
             return 1
         fi
+        git add . && git commit -m "Auto commit"
         if ! git rebase origin/master; then
             echo "Git rebase failed" >&2
             return 1
@@ -56,12 +57,12 @@ ss() {
             echo "Yarn build failed" >&2
             return 1
         fi
-        if ! ~/Coding/myscript/sy/syp.sh master all "$@"; then  # 替换 master all 为 master "$@"
+        if ! ~/Coding/myscript/sy/syp.sh master all "$@"; then
             echo "syp.sh failed" >&2
             return 1
         fi
     else
-        if ! ~/Coding/myscript/sy/syp.sh master "$@"; then  # 替换 master 为 master "$@"
+        if ! ~/Coding/myscript/sy/syp.sh master "$@"; then
             echo "syp.sh failed" >&2
             return 1
         fi
@@ -93,7 +94,7 @@ EOF
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Deploy succeeded" >> "$log_file"
         # 成功通知
         osascript <<EOF
-        display notification "Deploy completed. Log: $log_file" with title "myscript" subtitle "✅ ss complete" sound name "Hero"
+        display notification "Deploy completed. Log: $log_file" with title "myscript" subtitle "✅ ss complete" sound name "Bottle"
 EOF
         exit 0
     else
@@ -110,3 +111,18 @@ EOF
         exit 1
     fi
 }
+
+# 检查脚本是否被直接运行，而不是被 source
+if [[ "$0" == "${(%):-%x}" && "${ZSH_EVAL_CONTEXT:-}" != *"file"* ]]; then
+    if [[ "$1" == "1" ]]; then
+        cd ~/Coding/phpcode && ssn
+    elif [[ "$1" == "2" ]]; then
+        cd ~/Coding/admin-vue && ssn
+    elif [[ "$1" == "3" ]]; then
+        cd ~/Coding/bbv2-uniapp && ssn
+    else
+        osascript <<EOF
+        display notification "Not support shortcut, just support option+1/2/3" with title "myscript" subtitle "❗️ ss failed" sound name "Ping"
+EOF
+    fi
+fi

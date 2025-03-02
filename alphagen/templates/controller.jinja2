@@ -53,6 +53,7 @@ class {{class_name}} extends CrudController
     */
     protected function processCreateData(array $data): array
     {
+        $data = parent::processCreateData($data);
         return $data;
     }
 
