@@ -18,11 +18,11 @@
                 :reset-query="resetQuery"
                 ref="baseListRef"
                 title="{{ table_comment }}"
-                :can-delete-="false"
-                :can-edit-="false"
-                :can-add-="false"
+                :can-delete_="false"
+                :can-edit_="false"
+                :can-add_="false"
                 :selectable="canBatch || canExport"
-                :opts-="[
+                :opts_="[
       {
         txt: '审批记录',
         type: 'warning',
@@ -37,6 +37,34 @@
     ]"
                 :show-search="!props.query"
         >
+            <template #toolbar>
+                <el-button-group v-if="canExport">
+                    <el-button type="primary" @click="handleExport" class="border-none pr-1">
+                        导出
+                    </el-button>
+                    <el-dropdown trigger="click" :hide-on-click="false">
+                        <el-button type="primary" class="!w-6 border-none pl-0 pr-1">
+                            <el-icon>
+                                <arrow-down/>
+                            </el-icon>
+                        </el-button>
+                        <template #dropdown>
+                            <el-dropdown-menu>
+                                <el-dropdown-item v-for="(config, key) in columns" :key="key" :disabled="true">
+                                    <el-checkbox
+                                        :model-value="config.visible"
+                                        @change="(val: boolean) => config.visible = val"
+                                        @click.stop
+                                    >
+                                        {{ '{{ config.label }}' }}
+                                    </el-checkbox>
+                                </el-dropdown-item>
+                            </el-dropdown-menu>
+                        </template>
+                    </el-dropdown>
+                </el-button-group>
+            </template>
+
             <template #search-items>
                 <el-form-item label="搜索" class="mt-[20px]">
                     <el-input v-model="query.keywords" class="w-[200px]" placeholder="请输入关键字" :prefix-icon="Search" clearable />
@@ -69,41 +97,21 @@
                     <el-button type="{{ button.type }}" @click='handleBatchUpdate({{ button.update_data | tojson }}, "{{ button.confirm_message }}")'>{{ button.text }}</el-button>
                 {%- endfor %}
                 </template>
-                <el-button v-if="canExport" type="primary" @click="handleExport">导出</el-button>
             </template>
-            {%- for field in table_fields %}
-                <el-table-column prop="{{ field.field }}" label="{{ field.label }}" {% if field.width %} width="{{ field.width }}"{% endif %}{% if field.align %} align="{{ field.align }}"{% endif %}{% if field.type == 'text' %} show-overflow-tooltip{% endif %}>
-                    {%- if field.template %}
-                        <template #default="{row}">
-                            {%- if field.display_type == 'enum' %}
-                                <enum-label field="{{ field.field|snake_to_camel }}Options" :value="row.{{ field.field }}"/>
-                            {%- elif field.display_type == 'data-id' %}
-                                <enum-label field="{{ field.data_id_props.options_name|snake_to_camel }}Options" :value="row.{{ field.field }}"/>
-                            {%- elif field.field == 'member_id' %}
-                                <div class="flex items-center gap-4">
-                                    <el-avatar v-if="row.member?.headimg" :size="40" :src="row.member?.headimg" />
-                                    <div class="flex flex-col gap-1">
-                                        <div class="text-gray-900">{{ '{{row.member?.nickname || row.member?.name}}' }}</div>
-                                        <div class="text-gray-500 text-sm">{{ '{{row.member?.mobile || row.member?.member_id}}' }}</div>
-                                    </div>
-                                </div>
-                            {%- elif field.display_type == 'money' %}
-                                <span class="text-orange-500">¥{{ '{{ row.' + field.field + ' }}' }}</span>
-                            {%- elif field.display_type == 'image' %}
-                                <file-label v-if="row.{{ field.field }}" :file-url="row.{{ field.field }}" height="60px" />
-                            {%- elif field.display_type=='file' %}
-                                <file-label v-if="row.{{ field.field }}" :file-url="row.{{ field.field }}" height="60px" />
-                            {%- elif field.display_type == 'switch2' %}
-                                <el-tag :type="row.{{ field.field }} ? 'success' : 'danger'" size="small">{{ '{{ row.' + field.field + ' ? "" : "" }}' }}</el-tag>
-                            {%- elif field.display_type == 'switch' %}
-                                <el-switch v-model="row.{{ field.field }}" :active-value="1" :inactive-value="0" @change="(value) => handleUpdate(row, { {{ field.field }}: value})" />
-                            {%- elif field.display_type == 'textarea' %}
-                                <el-tooltip :content="row.{{ field.field }}" placement="top" :hide-after="2000"><span>{{ '{{ row.' + field.field + ' }}' }}</span></el-tooltip>
-                            {%- endif %}
-                        </template>
-                    {% endif -%}
+
+            <template v-for="(config, key) in columns" :key="key">
+                <el-table-column
+                    v-if="config.visible"
+                    :prop="config.prop"
+                    :label="config.label"
+                    :width="config.width"
+                    :align="config.align"
+                >
+                    <template #default="scope" v-if="config.render">
+                        <component :is="config.render(scope)" />
+                    </template>
                 </el-table-column>
-            {%- endfor %}
+            </template>
 
             {%- if has_delete %}
                 <el-table-column prop="delete_time" label="删除时间" width="180" v-if="showRestore"/>
@@ -133,9 +141,10 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, PropType, reactive, ref } from 'vue'
-import { Search } from '@element-plus/icons-vue'
+import { computed, h, PropType, reactive, ref } from 'vue'
+import { Search, ArrowDown } from '@element-plus/icons-vue'
 import BaseList from '@/components/base-list.vue'
+import MemberInfo from "@/components/member-info.vue";
 import EnumSelector from "@/components/enum/enum-selector.vue"
 import EnumLabel from "@/components/enum/enum-label.vue"
 import FileLabel from "@/components/file-label.vue";
@@ -181,13 +190,15 @@ const API = {
   restoreBatch: '/{{ module_name }}.{{ class_name }}/restoreBatch',
   {%- endif %}
   updateBatch: '/{{ module_name }}.{{ class_name }}/updateBatch',
-  export: VITE_PROXY_TARGET+'/admin/insale.InsaleWithdraw/list?export=1&admin_token='+encodeURIComponent(token)+"&site_id="+site_id,
+  export: VITE_PROXY_TARGET + '/admin/{{ module_name }}.{{ class_name }}/list',
   audit: '/{{ module_name }}.{{ class_name }}/audit',
   settle: '/{{ module_name }}.{{ class_name }}/settle',
 }
 
 const baseListRef = ref<InstanceType<typeof BaseList> | null>(null)
 const showRestore = computed(() => query.is_trashed)
+const canBatch = ref(true)
+const canExport = ref(true)
 
 // 查询条件
 const query = reactive({
@@ -260,15 +271,42 @@ const handleBatchUpdate = async (updateData: any, message = '确定要批量更�
   }
 }
 
-const canBatch = ref(false)
-const canExport = ref(false)
 const handleExport = () => {
-    const selection = baseListRef.value?.getSelectedRows()
-    if (!selection?.length) {
-        ElMessage.warning('请先选择要导出的记录')
-        return
-    }
-    window.location.href = `${API.export}&${selection.map(item => "id[]="+item.id).join("&")}&sort_field=${query.sort_field}&sort_order=${query.sort_order}`
+  const selection = baseListRef.value?.getSelectedRows()
+  if (!selection?.length) {
+    ElMessage.warning('请先选择要导出的记录')
+    return
+  }
+
+  // 构建基础参数
+  const baseParams = new URLSearchParams({
+    export: '1',
+    admin_token: token,
+    site_id: site_id
+  })
+
+  // 添加选中的ID
+  selection.forEach(item => {
+    baseParams.append('id[]', item.id)
+  })
+
+  // 添加可见列及其中文标签
+  Object.entries(columns.value)
+    .filter(([_, config]) => config.visible)
+    .forEach(([key, config]) => {
+      baseParams.append('column_keys[]', key)
+      baseParams.append('column_names[]', config.label)
+    })
+
+  // 添加排序参数
+  if (query.sort_field) baseParams.append('sort_field', query.sort_field)
+  if (query.sort_order) baseParams.append('sort_order', query.sort_order)
+
+  // 构建完整URL
+  const exportUrl = `${API.export}?${baseParams.toString()}`
+
+  // 触发导出
+  window.location.href = exportUrl
 }
 
 const handleOperation = async (row: any) => {
@@ -301,5 +339,61 @@ const operationSubmit = async () => {
     operationDialogVisible.value = false
     baseListRef.value?.reload()
 }
+
+// 列配置
+const columns = ref({
+  {%- for field in table_fields %}
+  {{ field.field }}: {
+    visible: true,
+    label: '{{ field.label }}',
+    prop: '{{ field.field }}'{% if field.width %},
+    width: '{{ field.width }}'{% endif %}{% if field.align %},
+    align: '{{ field.align }}'{% endif %}{% if field.display_type == 'enum' or field.display_type == 'data-id' or field.display_type == 'money' or field.display_type == 'image' or field.display_type == 'file' or field.display_type == 'switch' or field.display_type == 'switch2' or field.display_type == 'textarea' or field.field == 'member_id' %},
+    render: (scope: { row: any }) => {
+      {%- if field.display_type == 'enum' %}
+      return h(EnumLabel, {
+        field: '{{ field.field|snake_to_camel }}Options',
+        value: scope.row.{{ field.field }}
+      })
+      {%- elif field.display_type == 'data-id' %}
+      return h(EnumLabel, {
+        field: '{{ field.data_id_props.options_name|snake_to_camel }}Options',
+        value: scope.row.{{ field.field }}
+      })
+      {%- elif field.field == 'member_id' %}
+      return h(MemberInfo, {
+        member: scope.row.member || scope.row
+      })
+      {%- elif field.display_type == 'money' %}
+      return h('span', { class: 'text-orange-500' }, `¥${scope.row.{{ field.field }}}`)
+      {%- elif field.display_type == 'image' or field.display_type == 'file' %}
+      if (!scope.row?.{{ field.field }}) return null
+      return h(FileLabel, {
+        fileUrl: scope.row.{{ field.field }},
+        height: '60px'
+      })
+      {%- elif field.display_type == 'switch2' %}
+      return h(ElTag, {
+        type: scope.row.{{ field.field }} ? 'success' : 'danger',
+        size: 'small'
+      }, () => scope.row.{{ field.field }} ? '是' : '否')
+      {%- elif field.display_type == 'switch' %}
+      return h(ElSwitch, {
+        modelValue: scope.row.{{ field.field }},
+        activeValue: 1,
+        inactiveValue: 0,
+        onChange: (value) => handleUpdate(scope.row, { {{ field.field }}: value})
+      })
+      {%- elif field.display_type == 'textarea' %}
+      return h(ElTooltip, {
+        content: scope.row.{{ field.field }},
+        placement: 'top',
+        hideAfter: 2000
+      }, () => h('span', null, scope.row.{{ field.field }}))
+      {%- endif %}
+    }{% endif %}
+  },
+  {%- endfor %}
+})
 </script>
 {{ '' }}

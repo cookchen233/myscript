@@ -90,6 +90,10 @@ class ModelGenerator(BaseGenerator):
                         relation_model = "\\app\\common\\model\\AdminUser"
                         local_key = "admin_id"
                         continue
+                    elif relation_name == "order":
+                        relation_model = "\\app\\common\\model\\ec\\EcOrderModel"
+                        local_key = "id"
+                        relation_name = "ec_order"
                     else:
                         relation_model = snake_to_camel(relation_table, True) + "Model"
 
