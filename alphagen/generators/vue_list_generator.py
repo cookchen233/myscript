@@ -16,7 +16,9 @@ class VueListGenerator(BaseGenerator):
             "field": "id",
             "label": "ID",
             "width": 80,
-            "align": "center"
+            "align": "center",
+            "sortable": True,
+            "export_key": "id"  # 添加导出键
         })
 
         # 不需要展示的字段
@@ -50,24 +52,29 @@ class VueListGenerator(BaseGenerator):
                 "display_type": display_type,
                 "base_type": base_type,
                 "template": False,
+                "sortable": False,
+                "export_key": None  # 默认导出键为None
             }
 
             # 根据类型设置特定配置
             type_configs = {
                 "datetime": {
-                    "width": 180
+                    "width": 180,
+                    "sortable": True
                 },
                 "enum": {
                     "width": 100,
-                    "template": True
+                    "template": True,
+                    "export_key": field_name + "_label"  # 枚举类型导出标签值
                 },
                 "switch": {
                     "width": 100,
-                    "template": True
+                    "template": True,
                 },
                 "data-id": {
                     "width": 100,
-                    "template": True
+                    "template": True,
+                    "export_key": field_name.replace("_id", "") + ".name"  # 数据ID类型导出标签值
                 },
                 "image": {
                     "width": 120,
@@ -82,6 +89,7 @@ class VueListGenerator(BaseGenerator):
                 "member": {
                     "width": 180,
                     "template": True,
+                    "export_key": "member.nickname"  # 会员类型导出昵称
                 }
             }
 

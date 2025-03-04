@@ -106,6 +106,7 @@
                     :label="config.label"
                     :width="config.width"
                     :align="config.align"
+                    :sortable="config.sortable ? 'custom' : false"
                 >
                     <template #default="scope" v-if="config.render">
                         <component :is="config.render(scope)" />
@@ -294,7 +295,8 @@ const handleExport = () => {
   Object.entries(columns.value)
     .filter(([_, config]) => config.visible)
     .forEach(([key, config]) => {
-      baseParams.append('column_keys[]', key)
+      const exportKey = config.export_key || key
+      baseParams.append('column_keys[]', exportKey)
       baseParams.append('column_names[]', config.label)
     })
 
@@ -348,7 +350,9 @@ const columns = ref({
     label: '{{ field.label }}',
     prop: '{{ field.field }}'{% if field.width %},
     width: '{{ field.width }}'{% endif %}{% if field.align %},
-    align: '{{ field.align }}'{% endif %}{% if field.display_type == 'enum' or field.display_type == 'data-id' or field.display_type == 'money' or field.display_type == 'image' or field.display_type == 'file' or field.display_type == 'switch' or field.display_type == 'switch2' or field.display_type == 'textarea' or field.field == 'member_id' %},
+    align: '{{ field.align }}'{% endif %}{% if field.sortable %},
+    sortable: {{ field.sortable|tojson }}{% endif %}{% if field.export_key %},
+    export_key: '{{ field.export_key }}'{% endif %}{% if field.display_type == 'enum' or field.display_type == 'data-id' or field.display_type == 'money' or field.display_type == 'image' or field.display_type == 'file' or field.display_type == 'switch' or field.display_type == 'switch2' or field.display_type == 'textarea' or field.field == 'member_id' %},
     render: (scope: { row: any }) => {
       {%- if field.display_type == 'enum' %}
       return h(EnumLabel, {
