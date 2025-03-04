@@ -26,7 +26,7 @@ class VueListGenerator(BaseGenerator):
             'id',
             'site_id',
             'admin_id',
-            'create_time','update_time', 'delete_time',
+            'update_time', 'delete_time',
             'imgs', 'images', 'description', 'url', 'content', 'remark'
         ]
 

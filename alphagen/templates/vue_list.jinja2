@@ -101,7 +101,7 @@
 
             <template v-for="(config, key) in columns" :key="key">
                 <el-table-column
-                    v-if="config.visible"
+                    v-if="config.visible && !['create_time'].includes(config.prop)"
                     :prop="config.prop"
                     :label="config.label"
                     :width="config.width"
