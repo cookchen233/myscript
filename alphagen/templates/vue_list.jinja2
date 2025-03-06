@@ -84,7 +84,7 @@
                             {%- elif field.search_type == 'switch' %}
                                 <el-select v-model="query.{{ field.field }}" class="w-[100px]" clearable placeholder="请选择"><el-option :value="1" label="开启" /><el-option :value="0" label="关闭" /></el-select>
                             {%- else %}
-                                <el-input-number v-model="query.{{ field.field }}" class="!w-[{{ field.width|default(120) }}px]" placeholder="请输入{{ field.label }}" {% if field.min is defined %}:min="{{ field.min }}"{% endif %} {% if field.precision is defined %}:precision="{{ field.precision }}"{% endif %} clearable />
+{#                                <el-input-number v-model="query.{{ field.field }}" class="!w-[{{ field.width|default(120) }}px]" placeholder="请输入{{ field.label }}" {% if field.min is defined %}:min="{{ field.min }}"{% endif %} {% if field.precision is defined %}:precision="{{ field.precision }}"{% endif %} clearable />#}
                             {%- endif %}
                         </el-form-item>
                     {%- endif %}
@@ -106,6 +106,7 @@
                     :label="config.label"
                     :width="config.width"
                     :align="config.align"
+                    :show-overflow-tooltip="config.display_type === 'textarea'"
                     :sortable="config.sortable ? 'custom' : false"
                 >
                     <template #default="scope" v-if="config.render">
@@ -300,9 +301,14 @@ const handleExport = () => {
       baseParams.append('column_names[]', config.label)
     })
 
+  if(!baseParams.get('column_keys[]')){
+    ElMessage.warning('请至少勾选一个字段')
+    return
+  }
+
   // 添加排序参数
-  if (query.sort_field) baseParams.append('sort_field', query.sort_field)
-  if (query.sort_order) baseParams.append('sort_order', query.sort_order)
+  if (route.query.sort_field) baseParams.append('sort_field', route.query.sort_field  as string)
+  if (route.query.sort_order) baseParams.append('sort_order', route.query.sort_order  as string)
 
   // 构建完整URL
   const exportUrl = `${API.export}?${baseParams.toString()}`
@@ -348,6 +354,7 @@ const columns = ref({
   {{ field.field }}: {
     visible: true,
     label: '{{ field.label }}',
+    display_type: '{{ field.display_type }}',
     prop: '{{ field.field }}'{% if field.width %},
     width: '{{ field.width }}'{% endif %}{% if field.align %},
     align: '{{ field.align }}'{% endif %}{% if field.sortable %},
