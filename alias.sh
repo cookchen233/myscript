@@ -124,15 +124,32 @@ qm() {
     site="$site" q m
 }
 
+SERVER="root@lc.server.host"
+BASE_PATH="/www/wwwroot/api.13012345822.com/runtime"
+DOWNLOAD_DIR=~/Downloads
+EDITOR="/Applications/Visual Studio Code.app"
+get_log() {
+    TODAY=$(date +%d); MONTH=$(date +%Y%m);
+    /usr/bin/scp ${SERVER}:${BASE_PATH}/$1/${MONTH}${TODAY}.log ${DOWNLOAD_DIR}/ &&
+    /usr/bin/open -a "${EDITOR}" ${DOWNLOAD_DIR}/${TODAY}.log
+}
+
 apilog() {
-    TODAY=$(date +%d); MONTH=$(date +%Y%m); /usr/bin/scp root@lc.server.host:/www/wwwroot/api.13012345822.com/runtime/api/log/${MONTH}/${TODAY}.log ~/Downloads/ && /usr/bin/open -a '/Applications/Visual Studio Code.app' ~/Downloads/${TODAY}.log
+    get_log "api/log"
 }
+
 conslog() {
-    TODAY=$(date +%d); MONTH=$(date +%Y%m); /usr/bin/scp root@lc.server.host:/www/wwwroot/api.13012345822.com/runtime/log/${MONTH}/${TODAY}.log ~/Downloads/ && /usr/bin/open -a '/Applications/Visual Studio Code.app' ~/Downloads/${TODAY}.log
+    get_log "log"
 }
+
 reqlog() {
-    TODAY=$(date +%d); MONTH=$(date +%Y%m); /usr/bin/scp root@lc.server.host:/www/wwwroot/api.13012345822.com/runtime/log/request/${MONTH}/${TODAY}.log ~/Downloads/ && /usr/bin/open -a '/Applications/Visual Studio Code.app' ~/Downloads/${TODAY}.log
+    get_log "log/request"
 }
+
+greqlog() {
+    get_log "log/global-request"
+}
+
 admlog() {
-    TODAY=$(date +%d); MONTH=$(date +%Y%m); /usr/bin/scp root@lc.server.host:/www/wwwroot/api.13012345822.com/runtime/admin/log/${MONTH}/${TODAY}.log ~/Downloads/ && /usr/bin/open -a '/Applications/Visual Studio Code.app' ~/Downloads/${TODAY}.log
+    get_log "admin/log"
 }
