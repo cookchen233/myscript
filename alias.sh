@@ -131,7 +131,7 @@ EDITOR="/Applications/Visual Studio Code.app"
 get_log() {
     TODAY=$(date +%d); MONTH=$(date +%Y%m);
     /usr/bin/scp ${SERVER}:${BASE_PATH}/$1/${MONTH}${TODAY}.log ${DOWNLOAD_DIR}/ &&
-    /usr/bin/open -a "${EDITOR}" ${DOWNLOAD_DIR}/${TODAY}.log
+    /usr/bin/open -a "${EDITOR}" ${DOWNLOAD_DIR}/${MONTH}${TODAY}.log
 }
 
 apilog() {
