@@ -1,6 +1,6 @@
 #!/bin/bash
 
-CONFIG_FILE="$HOME/Coding/myscript/sync_config.txt"
+CONFIG_FILE="$HOME/Coding/myscript/mac-to-win.conf"
 
 # 读取所有源和目标目录
 SOURCES=()

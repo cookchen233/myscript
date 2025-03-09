@@ -436,7 +436,7 @@ if [[ -n "$ZSH_NAME" ]]; then
 
         # 情况 1：query 或 q 后提示表名
         if [[ "$buffer" =~ "^(query|q)[ ]*$" ]]; then
-            selected=$(get_all_tables | fzf --prompt="选择表名 > " --height=40% --border --query="")
+            selected=$(get_all_tables | fzf --prompt="选择表名 > " --height=40% --reverse --border --query="")
             if [ -n "$selected" ]; then
                 local table_name=$(echo "$selected" | sed 's/ (\(.*\))//')
                 LBUFFER="$buffer $table_name"
@@ -451,7 +451,7 @@ if [[ -n "$ZSH_NAME" ]]; then
 
         # 情况 2：j 后提示表名
         if [[ "$buffer" =~ "j[ ]*$" ]]; then
-            selected=$(get_all_tables | fzf --prompt="选择 JOIN 表名 > " --height=40% --border --query="")
+            selected=$(get_all_tables | fzf --prompt="选择 JOIN 表名 > " --height=40% --reverse --border --query="")
             if [ -n "$selected" ]; then
                 local table_name=$(echo "$selected" | sed 's/ (\(.*\))//')
                 LBUFFER="$buffer $table_name"
@@ -489,7 +489,7 @@ if [[ -n "$ZSH_NAME" ]]; then
             return
         fi
 
-        selected=$(printf "%s\n" "${all_fields[@]}" | fzf --prompt="选择字段 > " --height=40% --border --query="")
+        selected=$(printf "%s\n" "${all_fields[@]}" | fzf --prompt="选择字段 > " --height=40% --reverse --border --query="")
         if [ -n "$selected" ]; then
             LBUFFER="$buffer $selected"
             zle reset-prompt
@@ -584,7 +584,7 @@ if [[ -n "$ZSH_NAME" ]]; then
         _query_fzf() {
             local buffer="$LBUFFER"
             local selected
-            selected=$(get_all_tables | fzf --prompt="选择表名 > " --height=40% --border --query="")
+            selected=$(get_all_tables | fzf --prompt="选择表名 > " --height=40% --reverse --border --query="")
             if [[ -n "$selected" ]]; then
                 local table_name=$(echo "$selected" | sed 's/ (\(.*\))//')
                 if [[ "$buffer" =~ "(query|q)[ ]+[^ ]+[ ].*j$" ]]; then

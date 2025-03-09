@@ -34,7 +34,7 @@ class VueEditGenerator(BaseGenerator):
             return "textarea"
 
         # 处理字段类型
-        if "tinyint" in form_type and ("is_" in field_name or "enabled" in field_name):
+        if ("tinyint" in form_type or "smallint") and ("is_" in field_name or "enabled" in field_name):
             return "switch"
         if "int" in form_type:
             return "number"

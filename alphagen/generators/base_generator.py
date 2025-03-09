@@ -160,8 +160,8 @@ class BaseGenerator(object):
             # 检查是否是枚举字段
             is_enum = False
 
-            # 1. tinyint 类型且有枚举值注释
-            if field['Type'].startswith('tinyint'):
+            # 1. tinyint/smallint 类型且有枚举值注释
+            if field['Type'].startswith('tinyint') or field['Type'].startswith('smallint'):
                 comment = field['Comment']
                 if '[' in comment and ']' in comment and ':' in comment:
                     is_enum = True
@@ -290,7 +290,7 @@ class BaseGenerator(object):
         comment = field["Comment"]
 
         # 通用的类型判断逻辑
-        if field_name.startswith("is_") and "tinyint" in field_type:
+        if field_name.startswith("is_") and ("tinyint" in field_type or "smallint" in field_type):
             return "switch"
 
         # 检查注释是否包含枚举定义 [1:xx, 2:yy] 格式

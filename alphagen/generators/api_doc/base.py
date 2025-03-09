@@ -98,7 +98,7 @@ class ApiDocBaseGenerator(BaseGenerator):
         """获取属性类型"""
         if field["Comment"].endswith('[json]'):
             return "json"
-        if any(t in  field["Type"].lower() for t in ['int', 'float', 'decimal', 'double', 'tinyint']):
+        if any(t in  field["Type"].lower() for t in ['int', 'float', 'decimal', 'double','smallint', 'tinyint']):
             return "number"
         elif 'datetime' in  field["Type"].lower() or 'timestamp' in  field["Type"].lower():
             return "datetime"
