@@ -38,7 +38,7 @@ class {{class_name}} extends CrudController
 
     protected function processReadResult(&$data)
     {
-        //$data->product_ids = $data->products ? array_column($data->products->toArray(), 'id') : [];
+        $data->grant_ids = $data->grants ? array_column($data->grants->toArray(), 'id') : [];
     }
 
     /**
@@ -67,35 +67,27 @@ class {{class_name}} extends CrudController
 
     protected function afterUpdate($model, $oldModel)
     {
-        // 处理关联数据
-        if (isset($data['product_ids'])) {
-            // 删除原有关联
-            TradeProductToProductRiskModel::where('product_risk_id', $data["id"])->delete();
-            $this->afterCreate($data);
-        }
+        $this->saveGrants($model);
     }
 
     protected function afterCreate($model)
     {
-        // 处理关联数据
-        if (isset($data["product_ids"])) {
-            $insertData = array_map(function ($productId) use ($data) {
-                return [
-                    'product_risk_id' => $data["id"],
-                    'product_id' => $productId,
-                    'create_time' => date('Y-m-d H:i:s'),
-                    'update_time' => date('Y-m-d H:i:s'),
-                    'site_id' => $this->site_id
-                ];
-            }, $data['product_ids']);
-            (new TradeProductToProductRiskModel())->insertAll($insertData);
-        }
+        $this->saveGrants($model);
     }
 
-    public function afterDelete($oldData)
+    public function afterDelete($oldModel)
     {
         // 删除数据关联
-        //TradeProductToProductRiskModel::where('product_risk_id', $oldData['id'])->delete();
+        //TradeProductToProductRiskModel::where('product_risk_id', $oldModel['id'])->delete();
+    }
+
+    private function saveGrants($model)
+    {
+        $grant_ids = input('grant_ids');
+        if ($grant_ids) {
+            $model->grants()->detach();
+            $model->grants()->attach($grant_ids);
+        }
     }
 
 }
