@@ -42,15 +42,24 @@ SITE_ID="$1"
 # 临时文件存储表信息
 TEMP_FILE="/tmp/mysql_tables_to_delete.txt"
 
-# 获取所有表名
+# 获取所有表名并计算总数
 echo "正在检查数据库 $DB_NAME 中的表..."
 MYSQL_PWD="$DB_PASSWORD" mysql -h "$DB_HOST" -u "$DB_USER" -N -e "SHOW TABLES FROM $DB_NAME" > "$TEMP_FILE"
+TOTAL_TABLES=$(wc -l < "$TEMP_FILE")
 
 # 存储需要清理的表
 TABLES_TO_DELETE=()
 
+# 计数器用于进度显示
+CURRENT_TABLE=0
+
 # 检查每个表是否有 site_id 字段，并确认是否有匹配数据
 while read -r table; do
+    # 更新进度
+    CURRENT_TABLE=$((CURRENT_TABLE + 1))
+    PERCENTAGE=$((CURRENT_TABLE * 100 / TOTAL_TABLES))
+    printf "扫描进度: %d/%d (%d%%) - 当前: %s\r" "$CURRENT_TABLE" "$TOTAL_TABLES" "$PERCENTAGE" "$table"
+
     # 检查是否在白名单中
     skip_table=false
     for whitelist_table in "${WHITELIST_TABLES[@]}"; do
@@ -70,7 +79,7 @@ while read -r table; do
         # 检查表中是否存在 site_id = $SITE_ID 的数据
         RECORD_COUNT=$(MYSQL_PWD="$DB_PASSWORD" mysql -h "$DB_HOST" -u "$DB_USER" -N -e \
             "SELECT COUNT(*) FROM $DB_NAME.$table WHERE site_id = '$SITE_ID'")
-        
+
         # if [ "$RECORD_COUNT" -gt 0 ]; then
         #     TABLES_TO_DELETE+=("$table")
         #     echo "表 $table 包含 site_id = $SITE_ID 的数据 ($RECORD_COUNT 条记录)"
@@ -82,6 +91,7 @@ while read -r table; do
         echo "$table"
     fi
 done < "$TEMP_FILE"
+echo -e "\n扫描完成"
 
 # 如果没有需要清理的表，退出
 if [ ${#TABLES_TO_DELETE[@]} -eq 0 ]; then
