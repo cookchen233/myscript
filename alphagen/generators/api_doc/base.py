@@ -117,7 +117,7 @@ class ApiDocBaseGenerator(BaseGenerator):
         comment = field["Comment"]
 
         if field_name.endswith('_img') or field_name.endswith('_image'):
-            return "https://xx.png"
+            return '"https://xx.png"'
         elif 'imgs' in field_name or 'images' in field_name:
             return []
         elif comment.endswith('[json]'):
@@ -129,22 +129,22 @@ class ApiDocBaseGenerator(BaseGenerator):
         elif field_name.startswith('_is'):
             return 0
         elif 'phone' in field_name:
-            return "13800138000"
+            return '"13800138000"'
         elif 'email' in field_name:
-            return "example@example.com"
+            return '"example@example.com"'
 
         # 根据类型处理
         if property_type == "number":
             return 0
         elif property_type == "datetime":
-            return "2024-01-01 00:00:00"
+            return '"2024-01-01 00:00:00"'
         elif property_type == "date":
-            return "2024-01-01"
+            return '"2024-01-01"'
         elif property_type == "time":
-            return "00:00:00"
+            return '"00:00:00"'
         else:
             c=self.clean_comment(comment)
-            return ""
+            return '""'
 
     def _get_model_relations(self, table_schema):
         """获取模型关联关系"""

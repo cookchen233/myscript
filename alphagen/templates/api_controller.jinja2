@@ -6,6 +6,7 @@ namespace app\api\controller{% if module_name %}\{{ module_name }}{% endif %};
 use app\api\controller\CrudController;{% endif %}
 
 use app\common\model{% if module_name %}\{{ module_name }}{% endif %}\{{class_name}}Model;
+use app\common\exception\DataNotFound;
 use think\response\Json;
 use think\db\Query;
 use think\Paginator;
@@ -20,10 +21,18 @@ class {{class_name}} extends CrudController
     {
         $this->model = new {{class_name}}Model();
         parent::initialize();
+        $id = input('id');
+        if ($id) {
+            $model = $this->model->find($id);
+            if (!$model) {
+                throw new DataNotFound();
+            }
+            $this->model = $model;
+        }
     }
 
     /**
-    * 应用自定义查询条件
+    * 查询条件(list+read)
     */
     protected function applyListQueryConditions(Query $query): static
     {
@@ -46,14 +55,21 @@ class {{class_name}} extends CrudController
     }
 
     /**
-    * 验证创建数据
+    * 创建数据检查
     */
-    protected function validateData(array $data)
+    protected function checkCreateData($data)
     {
     }
 
     /**
-    * 处理创建数据
+    * 更新数据检查
+    */
+    protected function checkUpdateData($data)
+    {
+    }
+
+    /**
+    * 处理创建数据(插入前)
     */
     protected function processCreateData(array $data): array
     {
@@ -61,7 +77,7 @@ class {{class_name}} extends CrudController
     }
 
     /**
-    * 处理创建数据
+    * 处理更新数据(更新前)
     */
     protected function processUpdateData(array $data): array
     {
@@ -80,11 +96,17 @@ class {{class_name}} extends CrudController
         return fail("该功能暂未实现");
     }
 
-    protected function afterUpdate($model, $oldModel)
+    /**
+    * 数据创建后
+    */
+    protected function afterCreate($model)
     {
     }
 
-    protected function afterCreate($model)
+    /**
+    * 数据更新后
+    */
+    protected function afterUpdate($model, $oldModel)
     {
     }
 

@@ -77,7 +77,7 @@ function ag() {
     fi
 }
 
-function tal() {
+function tanlog() {
     tail -f /Users/Chen/Coding/myscript/notification-server/main.log | awk '
 /^Details:/ {
     printf "\033[31m%s\033[0m\n",$0;
@@ -88,6 +88,10 @@ p&&/^trace_id:/{p=0}
 p {
     printf "\033[36m%s\033[0m\n",$0
 }'
+}
+
+function taxlog() {
+    tail -n +1 -F /Users/Chen/Coding/phpcode/x.log
 }
 
 # 在 按键值
@@ -116,6 +120,7 @@ test_key() {
 : ${site:=20}
 source ~/Coding/myscript/mysql_query.sh
 source ~/Coding/myscript/clean_orphans.sh
+# source ~/Coding/myscript/ddd.sh
 alias dm=delete_member_and_related
 alias dmcc=check_and_clean_orphans
 alias q=query
@@ -123,6 +128,7 @@ qm() {
     [ -n "$1" ] && site="$1"
     site="$site" q m
 }
+alias ddd='~/Coding/myscript/ddd.sh'
 
 SERVER="root@lc.server.host"
 BASE_PATH="/www/wwwroot/api.13012345822.com/runtime"

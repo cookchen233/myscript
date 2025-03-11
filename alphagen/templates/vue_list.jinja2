@@ -22,18 +22,30 @@
                 :can-edit_="false"
                 :can-add_="false"
                 :selectable="canBatch || canExport"
-                :opts_="[
-      {
-        txt: '审批记录',
-        type: 'warning',
-        event: handleXxDialogOpen,
-      },
-      {
-        txt: '结算',
-        type: 'warning',
-        disabled:row=>row.id === 0,
-        event: handleOperation,
-      }
+                :opts="[
+      // {
+      //   txt: '审批记录',
+      //   type: 'warning',
+      //   event: handleXxDialogOpen,
+      // },
+      // {
+      //   txt: '结算',
+      //   type: 'warning',
+      //   disabled:row=>row.xx.id !== 1,
+      //   event: handleSettle,
+      // },
+      // {
+      //   txt: '审核',
+      //   type: 'warning',
+      //   disabled:row=>row.audit_status !== 1,
+      //   event: handleOperationDialogOpen,
+      // },
+      // {
+      //   txt: '查看',
+      //   type: 'warning',
+      //   disabled:row=>row._status !== 1,
+      //   event: handleDetailDialogOpen,
+      // },
     ]"
                 :show-search="!props.query"
         >
@@ -124,6 +136,8 @@
     <!-- <XxList :query="xxQuery" :on-edit-success="onEditSuccess" /> -->
     <!-- </el-dialog> -->
 
+   <!-- <Detail v-if="detailDialogVisible" mode="dialog" v-model:visible="detailDialogVisible" :id="detailId" @success="onDetailSuccess" /> -->
+
     <!-- 操作弹窗 -->
     <el-dialog v-model="operationDialogVisible" title="操作" width="500px" destroy-on-close>
         <el-form :model="operationForm" label-width="100px">
@@ -156,8 +170,9 @@ import {{ class_name }}Edit from './edit.vue'
 import EnumProvider from "@/components/enum/enum-provider.vue"
 import {useGlobalProperties} from "@/composables/useGlobalProperties";
 import {useRoute} from "vue-router";
-import {ElMessage, ElMessageBox} from "element-plus";
+import {ElMessage, ElMessageBox, ElSwitch} from "element-plus";
 //import XxList from '../enroll/list.vue'
+//import Detail from "./detail.vue";
 
 
 const props = defineProps({
@@ -230,6 +245,18 @@ const xxQuery = ref<Object | null>(null)
 const handleXxDialogOpen = (row: any) => {
   xxDialogVisible.value = true
   xxQuery.value = { {{ alias_name }} :row.id}
+}
+
+// 弹窗控制
+const detailDialogVisible = ref(false)
+const detailId = ref(0)
+const handleDetailDialogOpen = (row: any) => {
+  detailDialogVisible.value = true
+  detailId.value = row.id
+}
+const onDetailSuccess = () =>{
+  baseListRef.value.reload()
+  detailDialogVisible.value = false
 }
 
 const handleUpdate = async (row: any, updateData: any) => {
@@ -317,7 +344,7 @@ const handleExport = () => {
   window.location.href = exportUrl
 }
 
-const handleOperation = async (row: any) => {
+const handleSettle = async (row: any) => {
     try {
         await ElMessageBox.confirm('确定结算吗？')
         const url = API.settle
@@ -335,8 +362,7 @@ const handleOperation = async (row: any) => {
 const currentRow = ref<any>(null)
 const operationDialogVisible = ref(false)
 const operationForm = reactive({})
-
-const handleTransfer = (row: any) => {
+const handleOperationDialogOpen = (row: any) => {
     currentRow.value = row
     operationForm.value = currentRow.value
     operationDialogVisible.value = true

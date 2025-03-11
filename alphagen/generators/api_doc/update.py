@@ -11,12 +11,21 @@ class ApiDocUpdateGenerator(ApiDocBaseGenerator):
             """判断字段是否应该作为创建API参数"""
             # 更新接口不需要的字段
             self.non_param_fields = {
-                'deleted_time', 'create_time', 'update_time',
+                'create_time', 
+                'update_time',
+                'deleted_time', 
                 'site_id',
                 'member_id',
                 'admin_id',
+                'audit_time', 
+                'audit_status', 
+                'audit_admin_id', 
+                'views',
+                'sales',
             }
             if field_name in self.non_param_fields:
+                return False
+            if field_name.endswith('_status'):
                 return False
 
             # 大多数其他字段都应该作为创建参数

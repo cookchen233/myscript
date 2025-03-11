@@ -66,6 +66,8 @@ defineOptions({
   inheritAttrs: false
 })
 
+const emit = defineEmits(['success'])
+
 const router = useRouter()
 const route = useRoute()
 const { $lc } = useGlobalProperties()
