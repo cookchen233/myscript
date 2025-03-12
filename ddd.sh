@@ -6,7 +6,7 @@ if [ -z "$DB_HOST" ] || [ -z "$DB_USER" ] || [ -z "$DB_PASSWORD" ] || [ -z "$DB_
     exit 1
 fi
 
-# 白名单表（用空格分隔）
+# 白名单表
 WHITELIST_TABLES=(
     "appeal"
     "category"
@@ -24,6 +24,7 @@ WHITELIST_TABLES=(
     "lc_ec_product_category"
     "lc_ec_product_tag"
     "lc_ec_product_to_product_tag"
+    "lc_ec_stock_log"
     "lc_ec_sku"
     "lc_ec_spec"
     "lc_ec_spec_value"
@@ -80,12 +81,12 @@ while read -r table; do
         RECORD_COUNT=$(MYSQL_PWD="$DB_PASSWORD" mysql -h "$DB_HOST" -u "$DB_USER" -N -e \
             "SELECT COUNT(*) FROM $DB_NAME.$table WHERE site_id = '$SITE_ID'")
 
-        # if [ "$RECORD_COUNT" -gt 0 ]; then
-        #     TABLES_TO_DELETE+=("$table")
-        #     echo "表 $table 包含 site_id = $SITE_ID 的数据 ($RECORD_COUNT 条记录)"
-        # else
-        #     echo "表 $table 有 site_id 字段，但无 site_id = $SITE_ID 的数据，跳过"
-        # fi
+         if [ "$RECORD_COUNT" -gt 0 ]; then
+             TABLES_TO_DELETE+=("$table")
+#             echo "表 $table 包含 site_id = $SITE_ID 的数据 ($RECORD_COUNT 条记录)"
+#         else
+#             echo "表 $table 有 site_id 字段，但无 site_id = $SITE_ID 的数据，跳过"
+         fi
     else
         echo "表 $table 无 site_id 字段，跳过"
         echo "$table"
@@ -117,14 +118,14 @@ fi
 # 执行清理操作
 echo "开始清理表数据..."
 for table in "${TABLES_TO_DELETE[@]}"; do
-    echo "清理表: $table"
+#    echo "清理表: $table"
     # 执行 DELETE 操作
     MYSQL_PWD="$DB_PASSWORD" mysql -h "$DB_HOST" -u "$DB_USER" -e \
         "DELETE FROM $DB_NAME.$table WHERE site_id = '$SITE_ID'"
     if [ $? -eq 0 ]; then
-        echo "表 $table 清理成功"
+        echo "$table 清理成功"
     else
-        echo "表 $table 清理失败"
+        echo "$table 清理失败"
     fi
 done
 

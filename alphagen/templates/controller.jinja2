@@ -49,20 +49,19 @@ class {{class_name}} extends CrudController
     }
 
     /**
-    * 处理创建数据
+    * 处理创建数据(插入前)
     */
     protected function processCreateData(array $data): array
     {
-        $data = parent::processCreateData($data);
         return $data;
     }
 
     /**
-    * 处理创建数据
+    * 处理更新数据(更新前)
     */
-    protected function processUpdateData(array $data): array
+    protected function processUpdateData(array $data, $oldModel): array
     {
-        return $this->processCreateData($data);
+        return $data;
     }
 
     protected function afterUpdate($model, $oldModel)

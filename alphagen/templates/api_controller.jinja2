@@ -79,7 +79,7 @@ class {{class_name}} extends CrudController
     /**
     * 处理更新数据(更新前)
     */
-    protected function processUpdateData(array $data): array
+    protected function processUpdateData(array $data, $oldModel): array
     {
         return $data;
     }
