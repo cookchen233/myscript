@@ -445,7 +445,7 @@ const columns = ref({
       })
       {%- elif field.field == 'member_id' %}
       return h(MemberInfo, {
-        member: scope.row.member || scope.row
+        member: scope.row.member
       })
       {%- elif field.display_type == 'money' %}
       return h('span', { class: 'text-orange-500' }, `¥${scope.row.{{ field.field }}}`)
