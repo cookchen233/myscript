@@ -15,18 +15,19 @@
 
 TABLE_ALIAS=(
     "m:lc_member"
-    "mt:lc_member_token"
-    "mw:lc_member_weixin"
-    "eo:lc_ec_order"
-    "es:lc_ec_shop"
-    "it:lc_insale_team"
+    "token:lc_member_token"
+    "weixin:lc_member_weixin"
+    "order:lc_ec_order"
+    "shop:lc_ec_shop"
+    "team:lc_insale_team"
     "itm:lc_insale_team_member"
-    "ic:lc_insale_commission"
-    "tf:lc_insale_team_flow"
-    "tc:lc_insale_team_change"
-    "tr:lc_insale_team_rate"
-    "sa:lc_insale_salary"
-    "sl:lc_insale_salary_log"
+    "commission:lc_insale_commission"
+    "flow:lc_insale_team_flow"
+    "change:lc_insale_team_change"
+    "team_rate:lc_insale_team_rate"
+    "salary:lc_insale_salary"
+    "salary_log:lc_insale_salary_log"
+    "product:lc_ec_product"
 )
 
 # 获取表的简短字段列表（用于查询显示）
@@ -501,8 +502,8 @@ if [[ -n "$ZSH_NAME" ]]; then
     }
 
     # 绑定空格键
-    zle -N _query_field_fzf
-    bindkey " " _query_field_fzf
+#    zle -N _query_field_fzf
+#    bindkey " " _query_field_fzf
 
     # Tab 补全
     _query() {

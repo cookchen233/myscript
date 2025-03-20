@@ -137,7 +137,7 @@ const rules: FormRules = {
     {%- if field.required -%}
       {{ field.field }}: [
         {%- if field.form_type == 'area-selector' -%}
-          { required: true, validator: (rule, value, callback) => { if (!value) { callback(new Error('请选择城市')); return; } const { city_code, district_code, street_code } = value; if (!city_code) { callback(new Error('请选择城市')); return; } if (!district_code) { callback(new Error('请选择区县')); return; } if (!street_code) { callback(new Error('请选择街道')); return; } formData.city_code = city_code; formData.district_code = district_code; formData.street_code = street_code; callback(); }, trigger: ['change', 'blur'] }
+            { required: true, validator: (rule, value, callback) => { if (!value) { callback(new Error('请选择省份')); return; } const { province_code, city_code, district_code, street_code } = value; if (!province_code) { callback(new Error('请选择省份')); return; }if (!city_code) { callback(new Error('请选择城市')); return; } if (!district_code) { callback(new Error('请选择区县')); return; } if (!street_code) { callback(new Error('请选择街道')); return; } Object.assign(formData, value); callback(); }, trigger: ['change', 'blur'] }
         {%- else -%}
           { required: true, message: '请{{ '选择' if field.form_type in ['enum', 'select', 'area-selector', 'select-file', 'data-id'] else '输入' }}{{ field.label }}', trigger: '{{ 'change' if field.form_type in ['select', 'enum', 'date-picker', 'area-selector', 'select-file', 'data-id'] else 'blur' }}' }
         {%- endif -%}

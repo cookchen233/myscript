@@ -18,7 +18,7 @@ class VueEditGenerator(BaseGenerator):
             return "switch"
         if any(word in field_name for word in ["status", "type", "level", "gender"]):
             return "enum"
-        if "area" in field_name or "region" in field_name:
+        if "area_codes" in field_name:
             return "area-selector"
         if "img" in field_name or "image" in field_name:
             return "select-image"

@@ -75,6 +75,26 @@
                         </template>
                     </el-dropdown>
                 </el-button-group>
+                <el-upload v-if="0"
+                        v-loading="loading"
+                        element-loading-text="正在导入..."
+                        class="upload-demo"
+                        :action="API.import"
+                        :headers="headers"
+                        :on-success="handleImportSuccess"
+                        :on-error="handleImportError"
+                        :on-progress="handleProgress"
+                        :before-upload="handleBeforeUpload"
+                        :show-file-list="false"
+                        accept=".xlsx"
+                >
+                    <el-button type="primary">导入</el-button>
+                </el-upload>
+                <import-template-button v-if="0"
+                        :api="API.importTemplate"
+                        :columns="columns"
+                        style="margin-left: 8px;"
+                />
             </template>
 
             <template #search-items>
@@ -104,7 +124,7 @@
             </template>
 
             <template #extra-buttons>
-                <template v-if="canBatch">
+                <template v-if="canBatch && 0">
                 {%- for button in batch_buttons %}
                     <el-button type="{{ button.type }}" @click='handleBatchUpdate({{ button.update_data | tojson }}, "{{ button.confirm_message }}")'>{{ button.text }}</el-button>
                 {%- endfor %}
@@ -171,6 +191,7 @@ import EnumProvider from "@/components/enum/enum-provider.vue"
 import {useGlobalProperties} from "@/composables/useGlobalProperties";
 import {useRoute} from "vue-router";
 import {ElMessage, ElMessageBox, ElSwitch} from "element-plus";
+import ImportTemplateButton from "@/components/import-template-button.vue";
 //import XxList from '../enroll/list.vue'
 //import Detail from "./detail.vue";
 
@@ -210,12 +231,14 @@ const API = {
   export: VITE_PROXY_TARGET + '/admin/{{ module_name }}.{{ class_name }}/list',
   audit: '/{{ module_name }}.{{ class_name }}/audit',
   settle: '/{{ module_name }}.{{ class_name }}/settle',
+    import: VITE_PROXY_TARGET+'/admin/{{ module_name }}.{{ class_name }}/import',
+    importTemplate: '/{{ module_name }}.{{ class_name }}/downloadImportTemplate',
 }
 
 const baseListRef = ref<InstanceType<typeof BaseList> | null>(null)
 const showRestore = computed(() => query.is_trashed)
-const canBatch = ref(true)
-const canExport = ref(true)
+const canBatch = ref(false)
+const canExport = ref(false)
 
 // 查询条件
 const query = reactive({
@@ -342,6 +365,29 @@ const handleExport = () => {
 
   // 触发导出
   window.location.href = exportUrl
+}
+
+const loading = ref(false)
+
+const handleBeforeUpload = () => {
+    loading.value = true
+    return true
+}
+
+const handleProgress = () => {
+    loading.value = true
+}
+const handleImportSuccess = (response, file, fileList) =>{
+    loading.value = false
+    if (response.code !== 1) {
+        ElMessage.error(response.msg);
+    } else {
+        ElMessage.success('导入成功');
+    }
+}
+const handleImportError = (err, file, fileList) =>{
+    loading.value = false
+    ElMessage.error('上传过程中出现错误');
 }
 
 const handleSettle = async (row: any) => {

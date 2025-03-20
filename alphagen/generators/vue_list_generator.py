@@ -122,6 +122,8 @@ class VueListGenerator(BaseGenerator):
                 'id', 'site_id',
                 'member_id',
                 'admin_id',
+                'audit_admin_id',
+                'audit_time',
                 'create_time',
                 'update_time', 'delete_time',
                 'preview_img', 'preview_image', 'main_image', 'imgs', 'images', 'description', 'url', 'content', 'remark'
