@@ -33,8 +33,8 @@ alias v='open -a /Applications/Visual\ Studio\ Code.app'
 alias sc="cd ~/Coding/myscript"
 alias co="cd ~/Coding"
 alias dn="cd ~/Downloads"
-alias rr="trash"
-alias rm="echo 'Please use rr instead of rm';false"
+# alias rr="trash"
+# alias rm="echo 'Please use rr instead of rm';false"
 alias vs="networksetup -showpppoestatus Atlantic"
 alias vd="networksetup -disconnectpppoeservice 'Atlantic'"
 alias vv="~/Coding/myscript/connect_to_vpn.sh"
@@ -134,28 +134,39 @@ SERVER="root@lc.server.host"
 BASE_PATH="/www/wwwroot/api.13012345822.com/runtime"
 DOWNLOAD_DIR=~/Downloads
 EDITOR="/Applications/Visual Studio Code.app"
-get_log() {
-    TODAY=$(date +%d); MONTH=$(date +%Y%m);
-    /usr/bin/scp ${SERVER}:${BASE_PATH}/$1/${MONTH}${TODAY}.log ${DOWNLOAD_DIR}/ &&
-    /usr/bin/open -a "${EDITOR}" ${DOWNLOAD_DIR}/${MONTH}${TODAY}.log
+
+getlog() {
+    # Use provided service or empty string
+    local SERVICE=${1:-}
+    # Use provided date or fallback to today
+    local TARGET_DATE=${2:-$(date +%Y%m%d)}
+    local MONTH=${TARGET_DATE:0:6}
+    local DAY=${TARGET_DATE:6:2}
+    local PATH_SUFFIX=""
+    
+    # Add service path if provided
+    [ -n "$SERVICE" ] && PATH_SUFFIX="/$SERVICE"
+    
+    /usr/bin/scp ${SERVER}:${BASE_PATH}${PATH_SUFFIX}/${MONTH}${DAY}.log ${DOWNLOAD_DIR}/ &&
+    /usr/bin/open -a "${EDITOR}" ${DOWNLOAD_DIR}/${MONTH}${DAY}.log
 }
 
 apilog() {
-    get_log "api/log"
+    getlog "api/log" "$1"
 }
 
 conslog() {
-    get_log "log"
+    getlog "log" "$1"
 }
 
 reqlog() {
-    get_log "log/request"
+    getlog "log/request" "$1"
 }
 
 greqlog() {
-    get_log "log/global-request"
+    getlog "log/global-request" "$1"
 }
 
 admlog() {
-    get_log "admin/log"
+    getlog "admin/log" "$1"
 }

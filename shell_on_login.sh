@@ -23,3 +23,6 @@ nohup python3 ~/Coding/myscript/auto-commit/main.py 1 >/dev/null 2>&1 &
 # 声音播报
 nohup python3 ~/Coding/myscript/shout_server_block.py > /tmp/shout_service.log 2>&1 &
 
+# idea内存占用监控
+nohup ~/Coding/myscript/kill-idea.sh > /tmp/kill-idea.log 2>&1 &
+

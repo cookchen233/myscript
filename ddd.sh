@@ -26,6 +26,7 @@ WHITELIST_TABLES=(
     "lc_ec_product_to_product_tag"
     "lc_ec_stock_log"
     "lc_ec_sku"
+    "lc_ec_package_item"
     "lc_ec_spec"
     "lc_ec_spec_value"
     "lc_label"

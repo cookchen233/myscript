@@ -11,12 +11,14 @@ class VueEditGenerator(BaseGenerator):
     def _get_form_type(self, field):
         form_type = field["Type"].lower()
         field_name = field["Field"].lower()
+        base_type = self._get_field_base_type(field)
         comment = field["Comment"]
 
     # 处理特殊字段名称
         if "enabled" in field_name or "disabled" in field_name or "is_" in field_name:
             return "switch"
-        if any(word in field_name for word in ["status", "type", "level", "gender"]):
+        # 检查注释是否包含枚举定义 [1:xx, 2:yy] 格式
+        if any(c.isdigit() for c in comment) and ":" in comment and "," in comment and "[" in comment and "]" in comment and base_type == "number":
             return "enum"
         if "area_codes" in field_name:
             return "area-selector"

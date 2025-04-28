@@ -4,26 +4,26 @@
 
 # set outputText to "我要你扮演一个辅导我提高英语的导师, 并且是一个全知全能者, 精通的领域除了英语, 还包括计算机编程知识, 生活知识, 美国文化等等, 我问你的每个问题你都要以最简短简洁有效的回答方式回答我. 我和你的每一句对话 (注意, 是每一句), 你都要先检查英语语法以及检查是否符合习惯用语, 如果语法不正确或是不是地道英语, 那就要先修正我的句子. 你听明白了就说 yes, 请首先一定先修正我的句子, 然后再回复我具体的问题, 两步, 不要忘记. 那么下面开始我们的第一句交流:
 
-open -a 'Grok.app'
+open -a 'Google Chrome.app'
 
-osascript <<ost
-tell application "System Events" 
+# osascript <<ost
+# tell application "System Events" 
 
-    -- 输入框焦点
-    keystroke key code 53 using {shift down}
+#     -- 输入框焦点
+#     keystroke key code 53 using {shift down}
 
-    -- 复制提示词
-    set ori_clipboard_text to (the clipboard as text)
-    set outputText to "I want you to act as an English teacher. When I write a sentence, first respond with 'Better:' followed by the improved version(s), focusing only on word choice and structure (ignore capitalization and punctuation errors). If my sentence is already correct, respond with 'Correct!'. Then provide the answer to my question. My first sentence is: 
-"
-    set the clipboard to {text:(outputText as string), Unicode text:outputText}
-    -- 粘贴提示词
-    keystroke "a" using command down
-    keystroke "v" using command down
+#     -- 复制提示词
+#     set ori_clipboard_text to (the clipboard as text)
+#     set outputText to "I want you to act as an English teacher. When I write a sentence, first respond with 'Better:' followed by the improved version(s), focusing only on word choice and structure (ignore capitalization and punctuation errors). If my sentence is already correct, respond with 'Correct!'. Then provide the answer to my question. My first sentence is: 
+# "
+#     set the clipboard to {text:(outputText as string), Unicode text:outputText}
+#     -- 粘贴提示词
+#     keystroke "a" using command down
+#     keystroke "v" using command down
 
-    -- 还原剪贴板
-    delay 0.1
-    set the clipboard to {text:(ori_clipboard_text as string), Unicode text:ori_clipboard_text}
+#     -- 还原剪贴板
+#     delay 0.1
+#     set the clipboard to {text:(ori_clipboard_text as string), Unicode text:ori_clipboard_text}
 
-end tell
-ost
+# end tell
+# ost

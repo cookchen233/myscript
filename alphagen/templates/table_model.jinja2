@@ -26,6 +26,8 @@ class {{class_name}} extends BaseModel
 {
     protected $name = '{{ table_name|replace(table_prefix, "") }}';
 
+    protected $defaultSoftDelete = null;
+
     use SoftDelete;
 
     {% if json_fields %}
