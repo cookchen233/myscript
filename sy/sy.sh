@@ -30,6 +30,10 @@ cleanup() {
 
     # 清理过期的缓存文件(比如7天前的)
     find "$CACHE_DIR" -type f -mtime +7 -delete 2>/dev/null
+    if [ -f "$CACHE_DIR/ssh_pid" ]; then
+        SSH_PID=$(<"$CACHE_DIR/ssh_pid")
+        kill $SSH_PID 2>/dev/null
+    fi
 
     # 清理SSH连接
     if [[ -n "$REMOTE_USER" && -n "$REMOTE_IP" && -n "$PORT" ]]; then
@@ -367,11 +371,17 @@ do_rsync() {
         find . $special_perm -maxdepth 5 -exec chown www:www {} +
     }"
 
-    if ! ssh -o ControlPath="~/.ssh/controlmasters/%r@%h:%p" \
+    # 后台运行 SSH 命令
+    ssh -o ControlPath="~/.ssh/controlmasters/%r@%h:%p" \
         -p "$PORT" \
         "$REMOTE_USER@$REMOTE_IP" \
-        "$ssh_cmd" 2>/dev/null; then
+        "$ssh_cmd" 2>"$RSYNC_ERROR_FILE" &
+    SSH_PID=$!
+
+    # 等待后台进程完成并检查退出状态
+    if ! wait $SSH_PID; then
         echo -e "\033[1;31m[ERROR] 权限设置失败\033[0m" >&2
+        cat "$RSYNC_ERROR_FILE" >&2
         echo "1" > "$SYNC_STATUS_FILE"
         return 1
     fi
