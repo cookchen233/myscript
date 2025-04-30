@@ -99,14 +99,14 @@ trap 'rm -f "${TEMP_FILE}" "${FINAL_FILE}"' EXIT
 
 # 处理日志文件
 find "${LOG_DIR}" -type f \( -name "*.log" -o -name "*.log.*.gz" \) -print0 | while IFS= read -r -d '' log_file; do
-    domain=$(basename "${log_file}" | sed 's/\.access\.log.*//;s/\.log.*//')
+    file_domain=$(basename "${log_file}" | sed 's/\.access\.log.*//;s/\.log.*//')
     if [ "$DEBUG" -eq 1 ]; then
         echo "Debug: Processing $log_file"
         MATCH_COUNT=$(if [[ "${log_file}" == *.gz ]]; then zcat "${log_file}"; else cat "${log_file}"; fi | command rg --no-filename --text "^[0-9.]+.*\[(${TIME_REGEX}:[0-2][0-9]:[0-5][0-9]:[0-5][0-9] [+-][0-9]{4}).*\].*\"(GET|POST)" | wc -l)
         echo "Debug: Found $MATCH_COUNT matching lines in $log_file"
     fi
     if [[ "${log_file}" == *.gz ]]; then
-        zcat "${log_file}" | command rg --no-filename --text "^[0-9.]+.*\[(${TIME_REGEX}:[0-2][0-9]:[0-5][0-9]:[0-5][0-9] [+-][0-9]{4}).*\].*\"(GET|POST)" | gawk -v domain="${domain}" -v past_time="${PAST_TIME}" -v current_time="${CURRENT_TIME}" '
+        zcat "${log_file}" | command rg --no-filename --text "^[0-9.]+.*\[(${TIME_REGEX}:[0-2][0-9]:[0-5][0-9]:[0-5][0-9] [+-][0-9]{4}).*\].*\"(GET|POST)" | gawk -v file_domain="${file_domain}" -v past_time="${PAST_TIME}" -v current_time="${CURRENT_TIME}" '
         BEGIN {
             months["Jan"] = 1; months["Feb"] = 2; months["Mar"] = 3; months["Apr"] = 4
             months["May"] = 5; months["Jun"] = 6; months["Jul"] = 7; months["Aug"] = 8
@@ -134,12 +134,16 @@ find "${LOG_DIR}" -type f \( -name "*.log" -o -name "*.log.*.gz" \) -print0 | wh
                         split(url, url_arr, "?")
                         url = url_arr[1]
                     }
-                    # 从 http_referer 提取域名
-                    domain_name = domain
+                    # 从 http_referer 提取域名，优先于文件名
+                    domain_name = file_domain
                     if (referer ~ /^https?:\/\/[^\/]+/) {
                         match(referer, /^https?:\/\/([^\/]+)/)
                         domain_name = substr(referer, RSTART+7, RLENGTH-7)
                         sub(/:[0-9]+$/, "", domain_name) # 移除端口
+                    }
+                    # 如果 referer 无效且文件名为 access，使用 unknown
+                    if (domain_name == "access" && referer == "-") {
+                        domain_name = "unknown"
                     }
                     if (time_str && url && domain_name != "-") {
                         print domain_name "\t" url "\t" time_str
@@ -148,7 +152,7 @@ find "${LOG_DIR}" -type f \( -name "*.log" -o -name "*.log.*.gz" \) -print0 | wh
             }
         }' >> "/tmp/temp_output.txt"
     else
-        command rg --no-filename --text "^[0-9.]+.*\[(${TIME_REGEX}:[0-2][0-9]:[0-5][0-9]:[0-5][0-9] [+-][0-9]{4}).*\].*\"(GET|POST)" "${log_file}" | gawk -v domain="${domain}" -v past_time="${PAST_TIME}" -v current_time="${CURRENT_TIME}" '
+        command rg --no-filename --text "^[0-9.]+.*\[(${TIME_REGEX}:[0-2][0-9]:[0-5][0-9]:[0-5][0-9] [+-][0-9]{4}).*\].*\"(GET|POST)" "${log_file}" | gawk -v file_domain="${file_domain}" -v past_time="${PAST_TIME}" -v current_time="${CURRENT_TIME}" '
         BEGIN {
             months["Jan"] = 1; months["Feb"] = 2; months["Mar"] = 3; months["Apr"] = 4
             months["May"] = 5; months["Jun"] = 6; months["Jul"] = 7; months["Aug"] = 8
@@ -176,12 +180,16 @@ find "${LOG_DIR}" -type f \( -name "*.log" -o -name "*.log.*.gz" \) -print0 | wh
                         split(url, url_arr, "?")
                         url = url_arr[1]
                     }
-                    # 从 http_referer 提取域名
-                    domain_name = domain
+                    # 从 http_referer 提取域名，优先于文件名
+                    domain_name = file_domain
                     if (referer ~ /^https?:\/\/[^\/]+/) {
                         match(referer, /^https?:\/\/([^\/]+)/)
                         domain_name = substr(referer, RSTART+7, RLENGTH-7)
                         sub(/:[0-9]+$/, "", domain_name) # 移除端口
+                    }
+                    # 如果 referer 无效且文件名为 access，使用 unknown
+                    if (domain_name == "access" && referer == "-") {
+                        domain_name = "unknown"
                     }
                     if (time_str && url && domain_name != "-") {
                         print domain_name "\t" url "\t" time_str
@@ -240,14 +248,14 @@ END {
     }
     for (key in count) {
         split(key, arr, "\t")
-        printf "%-30s %-50s %-10d %-20s\n", arr[1], arr[2], count[key], latest_time[key] > "'"${FINAL_FILE}"'"
+        printf "%-20s %-40s %-10d %-15s\n", arr[1], arr[2], count[key], latest_time[key] > "'"${FINAL_FILE}"'"
     }
 }' "/tmp/temp_output.txt"
 
 # 排序并输出
 if [ -s "${FINAL_FILE}" ]; then
-    printf "%-30s %-50s %-10s %-20s\n" "Domain" "URL" "Count" "Latest Time"
-    printf "%-30s %-50s %-10s %-20s\n" "------" "---" "-----" "-----------"
+    printf "%-20s %-40s %-10s %-15s\n" "Domain" "URL" "Count" "Latest Time"
+    printf "%-20s %-40s %-10s %-15s\n" "------" "---" "-----" "-----------"
     sort -k3 -nr "${FINAL_FILE}" | head -n "${TOP_N}"
 else
     echo "警告：没有生成最终输出，可能由于处理错误"
