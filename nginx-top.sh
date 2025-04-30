@@ -2,7 +2,7 @@
 
 # 脚本用途：分析nginx日志，统计最近N分钟访问量前M的地址
 # 依赖：rg (ripgrep), gawk, sort, date, find
-# 使用示例：./nginx_log_analyzer.sh [log_dir] [time_range] [top_n] [--test-date "YYYY-MM-DD HH:MM:SS"]
+# 使用示例：./nginx-top.sh [log_dir] [time_range] [top_n] [--test-date "YYYY-MM-DD HH:MM:SS"]
 
 # 默认参数
 OS_TYPE=$(uname -s)
