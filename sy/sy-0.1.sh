@@ -1,16 +1,15 @@
 #!/bin/bash
 # 合并+推送+同步远程文件的快捷命令
-# 多进程版本，性能极致优化，针对大量新增文件场景优化
+# 多进程版本, 性能极致优化
 
 # 使用说明
 # 在项目根目录执行 syp.sh <目标分支>
-# 说明: 若当前处于任务分支，将自动切换到目标分支后合并任务分支，如果已经在目标分支，则仅推送+同步
-# 配置: 项目根目录放置对应的目标服务器配置，文件名为 sync_目标服务器(目标分支).json
-# 可使用像 git commit 那样的多个 -m 参数，如: syp.sh test -m "消息主题 (subject)" -m "消息内容 (body)"
-# 如果没有 -m 参数，默认取最后一次的消息主题
-# 如果已经合并过一次，可使用 -ma，如: syp.sh test -ma "消息内容2"，这将沿用上一次的消息主题
-# 使用 all 参数进行全量同步，如: syp.sh test all
-# 优化: 当检测到大量新增文件时，提示使用全量同步，自动分批处理增量同步
+# 说明: 若当前处于任务分支, 将自动切换到目标分支后合并任务分支, 如果已经在目标分支, 则仅推送+同步
+# 配置: 项目根目录放置对应的目标服务器配置, 文件名为 sync_目标服务器(目标分支).json
+# 可使用像 git commit 那样的多个 -m 参数, 如: sy test -m "消息主题 (subject)" -m "消息内容 (body)"
+# 如果没有 -m 参数, 默认取最后一次的消息主题
+# 如果已经合并过一次, 可使用 -ma 如: sy test -ma "消息内容2", 这将沿用上一次的消息主题
+# 使用 all 参数进行全量同步，如: sy test all
 
 export LC_ALL=C
 export LANG=C
@@ -26,7 +25,7 @@ mkdir -p "$CACHE_DIR"
 
 cleanup() {
     # 删除临时文件
-    rm -f "$SYNC_STATUS_FILE" "$GIT_STATUS_FILE" "$GIT_ERROR_FILE" "$RSYNC_ERROR_FILE" "$temp_file_list" "${temp_file_list}_part_"* 2>/dev/null
+    rm -f "$SYNC_STATUS_FILE" "$GIT_STATUS_FILE" "$GIT_ERROR_FILE" "$RSYNC_ERROR_FILE"
 
     # 清理过期的缓存文件(比如7天前的)
     find "$CACHE_DIR" -type f -mtime +7 -delete 2>/dev/null
@@ -103,9 +102,11 @@ read_config() {
     local cache_file="$CACHE_DIR/${json_file_name}.cache"
 
     if [[ ! -f "$json_file_name" ]]; then
-        echo -e "\033[1;31m找不到配置文件 $json_file_name\033[0m"
-        echo -e "\033[1;31m请创建配置文件，格式示例：\033[0m"
-        cat << 'EOF'
+    echo -e "\033[1;31m找不到配置文件 $json_file_name\033[0m"
+    echo -e "\033[1;31m请创建配置文件，格式示例：\033[0m"
+
+    # 先显示配置文件格式
+    cat << 'EOF'
 {
     "path": "/",
     "to_path": "project/",
@@ -115,6 +116,8 @@ read_config() {
     "root": "/www/wwwroot/"
 }
 EOF
+
+        # 再显示配置说明
         echo -e "配置说明:"
         echo -e "path      - 本地项目相对路径(通常为/)"
         echo -e "to_path   - 远程项目相对路径(相对于root)"
@@ -145,40 +148,6 @@ EOF
     return 0
 }
 
-# 错误处理函数（从V2引入，优化错误诊断）
-handle_rsync_error() {
-    local rsync_output="$1"
-    local ret="$2"
-
-    if echo "$rsync_output" | grep -qi "connection refused"; then
-        echo -e "\033[1;31mrsync同步失败: SSH连接被拒绝，请检查:\n\
-1. SSH连接信息(用户名/IP/端口)是否正确\n\
-2. 目标服务器SSH服务是否正常运行\n\
-3. 防火墙是否允许该端口连接\033[1;0m"
-    elif echo "$rsync_output" | grep -qi "permission denied"; then
-        echo -e "\033[1;31mrsync同步失败: 权限被拒绝，请检查:\n\
-1. SSH密钥或密码是否正确\n\
-2. 目标目录的读写权限\033[1;0m"
-    elif echo "$rsync_output" | grep -qi "no such file or directory"; then
-        echo -e "\033[1;31mrsync同步失败: 目录不存在，请检查:\n\
-1. 源目录是否存在\n\
-2. 目标目录是否存在或是否有权限创建\033[1;0m"
-    elif echo "$rsync_output" | grep -qi "ssh_exchange_identification"; then
-        echo -e "\033[1;31mrsync同步失败: SSH握手失败，请检查:\n\
-1. SSH服务器配置是否正确\n\
-2. 是否被服务器拒绝连接（如DenyHosts）\033[1;0m"
-    elif echo "$rsync_output" | grep -qi "argument list too long"; then
-        echo -e "\033[1;31mrsync同步失败: 文件列表过长，请尝试:\n\
-1. 使用全量同步（all参数）\n\
-2. 减少单次同步的文件数量\033[1;0m"
-    else
-        echo -e "\033[1;31mrsync同步失败: 发生未知错误（错误码：$ret）\n\
-详细错误信息:\n$rsync_output\033[1;0m"
-    fi
-    echo "1" > "$SYNC_STATUS_FILE"
-    return 1
-}
-
 do_rsync() {
     local target=$1
     local is_all=$2
@@ -186,14 +155,14 @@ do_rsync() {
 
     timer_start "rsync同步"
 
+    #执行yzl脚本#########################################################
     HOME_WORK_PATH=$(pwd)
-    SERVER_HOME_WORK_PATH="/www/wwwroot/" # 服务器基础目录
+    SERVER_HOME_WORK_PATH="/www/wwwroot/" #服务器基础目录
     PORT=22
 
     # 读取配置文件
     json_file_name="sync_${target}.json"
     if ! read_config "$json_file_name"; then
-        echo "1" > "$SYNC_STATUS_FILE"
         return 1
     fi
 
@@ -211,25 +180,31 @@ do_rsync() {
     REMOTE_DIR=$SERVER_HOME_WORK_PATH$TO_PATH
 
     # 设置SSH控制主连接
+    # 创建控制socket目录
     mkdir -p ~/.ssh/controlmasters
-    ssh -O stop -o ControlPath="~/.ssh/controlmasters/%r@%h:%p" -p "$PORT" "$REMOTE_USER@$REMOTE_IP" 2>/dev/null || true
+
+    # 清理可能存在的旧连接
+    ssh -O stop -o ControlPath="~/.ssh/controlmasters/%r@%h:%p" \
+        -p "$PORT" "$REMOTE_USER@$REMOTE_IP" 2>/dev/null || true
+
+    # 删除可能存在的旧 socket 文件
     rm -f ~/.ssh/controlmasters/"$REMOTE_USER@$REMOTE_IP:$PORT" 2>/dev/null || true
+
+    # 设置SSH控制主连接
     ssh -nNf -o ControlMaster=yes \
            -o ControlPath="~/.ssh/controlmasters/%r@%h:%p" \
-           -o ControlPersist=10m \
-           -o ServerAliveInterval=60 \
+           -o ControlPersist=5m \
            -p "$PORT" "$REMOTE_USER@$REMOTE_IP"
 
     # 基础的rsync选项
     declare -a base_rsync_opts=(
-        --rsh="ssh -p $PORT -o ControlPath=~/.ssh/controlmasters/%r@%h:%p"
-        -azuP
-        --no-perms
-        --no-owner
-        --no-group
-        --compress-level=9
-        --timeout=300 # 设置rsync超时时间
-    )
+    --rsh="ssh -p $PORT -o ControlPath=~/.ssh/controlmasters/%r@%h:%p"
+    -azuP
+    --no-perms
+    --no-owner
+    --no-group
+    --compress-level=9
+)
 
     # 构建special_perm条件
     declare -a special_perm_files=(
@@ -239,14 +214,6 @@ do_rsync() {
     for file in "${special_perm_files[@]}"; do
         special_perm+="! -name '$file' "
     done
-
-    # 检查远程磁盘空间
-    if ! ssh -o ControlPath="~/.ssh/controlmasters/%r@%h:%p" -p "$PORT" "$REMOTE_USER@$REMOTE_IP" \
-        "df -h '$REMOTE_DIR' | grep -q '100%'"; then
-        echo -e "\033[1;31m错误: 远程磁盘空间不足，请检查服务器磁盘\033[0m"
-        echo "1" > "$SYNC_STATUS_FILE"
-        return 1
-    fi
 
     if [ "$is_all" == true ]; then
         # 初始化排除项
@@ -259,6 +226,7 @@ do_rsync() {
         if [[ -f .gitignore ]]; then
             while IFS= read -r line; do
                 [[ -z "$line" || "$line" =~ ^# || "$line" =~ ^\.git ]] && continue
+                # 不排除配置文件中指定的路径
                 if [ "$line" == "${PUSH_PATH#/}" ] || [ "$line" == "${PUSH_PATH}" ]; then
                     continue
                 fi
@@ -278,99 +246,69 @@ do_rsync() {
 
         # 执行文件同步
         echo -e "\033[1;34m开始全量同步:\n$LOCAL_DIR => $REMOTE_DIR\033[0m"
-        max_attempts=3 # rsync重试机制
-        for ((attempt=1; attempt<=max_attempts; attempt++)); do
-            if rsync_output=$(rsync "${rsync_opts[@]}" \
-                "$LOCAL_DIR/" "$REMOTE_USER@$REMOTE_IP:$REMOTE_DIR/" 2>&1); then
-                echo "$rsync_output"
-                break
-            else
-                echo "$rsync_output" >> "$RSYNC_ERROR_FILE"
-                if [ $attempt -eq $max_attempts ]; then
-                    handle_rsync_error "$rsync_output" $?
-                    return 1
-                fi
-                echo -e "\033[1;33m第$attempt次同步失败，尝试重试...\033[0m"
-            fi
-        done
-    else
-        # 获取变更文件列表，优化大量文件处理
-        temp_file_list=$(mktemp)
-        trap 'rm -f "$temp_file_list" "${temp_file_list}_part_"*' EXIT
-        if ! git diff --name-only --diff-filter=ACM HEAD~1...HEAD 2>/dev/null > "$temp_file_list"; then
-            echo -e "\033[1;31m获取变更文件列表失败\033[0m"
+        if rsync_output=$(rsync "${rsync_opts[@]}" \
+            "$LOCAL_DIR/" "$REMOTE_USER@$REMOTE_IP:$REMOTE_DIR/" 2>&1); then
+            echo "$rsync_output"
+        else
+            echo "$rsync_output"
             echo "1" > "$SYNC_STATUS_FILE"
             return 1
         fi
 
-        # 检查文件数量，提示全量同步
-        file_count=$(wc -l < "$temp_file_list")
-        if [ "$file_count" -gt 1000 ]; then
-            echo -e "\033[1;33m警告：检测到大量变更文件（$file_count个），建议使用全量同步（all参数）以提高稳定性\033[0m"
-            # 可选：自动切换到全量同步
-            # is_all=true
-        fi
-
-        if [ "$file_count" -eq 0 ]; then
+    else
+        # 获取变更文件列表
+        if ! files=$(git diff --name-only HEAD~1...HEAD 2>/dev/null) || [ -z "$files" ]; then
             echo -e "\033[1;34m没有检测到文件变更，跳过同步\033[0m"
             return 0
         fi
 
-        echo -e "\033[1;34m待同步的文件列表（共$file_count个）:\033[0m"
+        echo -e "\033[1;34m待同步的文件列表:\033[0m"
         echo "--------------------------------"
-        head -n 50 "$temp_file_list" # 限制显示，避免过多输出
-        [ "$file_count" -gt 50 ] && echo -e "...（仅显示前50个文件）"
+        echo -e "$files"
         echo "--------------------------------"
 
-        # 分割文件列表，处理大量文件
-        split -l 1000 "$temp_file_list" "${temp_file_list}_part_" # 每1000行一个文件
-        echo -e "\033[1;34m开始增量同步（分批处理）...\033[0m"
-        max_attempts=3
-        for part in "${temp_file_list}_part_"*; do
-            if [ ! -f "$part" ]; then
-                echo -e "\033[1;33m无文件需要同步\033[0m"
-                break
-            fi
-            declare -a rsync_opts=(
-                "${base_rsync_opts[@]}"
-                --files-from="$part"
-            )
-            for ((attempt=1; attempt<=max_attempts; attempt++)); do
-                if rsync_output=$(rsync "${rsync_opts[@]}" \
-                    "$LOCAL_DIR/" "$REMOTE_USER@$REMOTE_IP:$REMOTE_DIR/" 2>&1); then
-                    echo "$rsync_output"
-                    break
-                else
-                    echo "$rsync_output" >> "$RSYNC_ERROR_FILE"
-                    if [ $attempt -eq $max_attempts ]; then
-                        handle_rsync_error "$rsync_output" $?
-                        return 1
-                    fi
-                    echo -e "\033[1;33m第$attempt次同步（部分文件）失败，尝试重试...\033[0m"
-                fi
-            done
-        done
+        # 创建临时文件列表
+        temp_file_list=$(mktemp)
+        trap 'rm -f "$temp_file_list"' EXIT
+        echo "$files" > "$temp_file_list"
+
+        # 同步变更文件
+        echo -e "\033[1;34m开始增量同步...\033[0m"
+        declare -a rsync_opts=(
+            "${base_rsync_opts[@]}"
+            --files-from="$temp_file_list"
+        )
+
+        if rsync_output=$(rsync "${rsync_opts[@]}" \
+            "$LOCAL_DIR/" "$REMOTE_USER@$REMOTE_IP:$REMOTE_DIR/" 2>&1); then
+            echo "$rsync_output"
+        else
+            echo "$rsync_output"
+            echo "1" > "$SYNC_STATUS_FILE"
+            return 1
+        fi
     fi
 
-    # 统一的权限设置逻辑，分批处理
+    # 统一的权限设置逻辑
     echo -e "\033[1;34m设置权限...\033[0m"
     ssh_cmd="cd '$REMOTE_DIR' && {
         find . -type d -exec chmod 755 {} + &
-        find . -type f $special_perm -maxdepth 5 -exec chmod 644 {} + & # 限制深度
+        find . -type f $special_perm -exec chmod 644 {} + &
         wait
-        find . $special_perm -maxdepth 5 -exec chown www:www {} + # 限制深度
+        find . $special_perm -exec chown www:www {} +
     }"
 
     if ! ssh -o ControlPath="~/.ssh/controlmasters/%r@%h:%p" \
         -p "$PORT" \
         "$REMOTE_USER@$REMOTE_IP" \
-        "$ssh_cmd" 2>/dev/null; then
+        "$ssh_cmd" 2>/dev/null &
+    then
         echo -e "\033[1;31m[ERROR] 权限设置失败\033[0m" >&2
         echo "1" > "$SYNC_STATUS_FILE"
         return 1
     fi
 
-    echo -e "\033[1;32m同步完成\033[0m"
+    echo -e "\033[1;32m同步完成\033[1;0m"
     echo "0" > "$SYNC_STATUS_FILE"
     timer_end "rsync同步"
 }
@@ -395,20 +333,14 @@ do_git_operations() {
     # push
     if $has_remote_branch; then
         echo -e "\033[1;34m推送 $target ...\033[1;0m"
-        max_attempts=3 # 推送重试机制
-        for ((attempt=1; attempt<=max_attempts; attempt++)); do
-            if git push --no-verify; then
-                echo -e "\033[1;32m推送完成\033[1;0m"
-                break
-            elif ! git pull --rebase || ! git push --no-verify; then
-                if [ $attempt -eq $max_attempts ]; then
-                    echo -e "\033[1;31m推送失败，请手动重试push命令\033[1;0m" >&2
-                    echo "1" > "$GIT_STATUS_FILE"
-                    return 1
-                fi
-                echo -e "\033[1;33m第$attempt次推送失败，尝试重试...\033[0m"
+        if ! git push --no-verify; then
+            if ! git pull --rebase && ! git push --no-verify; then
+                echo -e "\033[1;31m推送失败\033[1;0m" >&2
+                echo "1" > "$GIT_STATUS_FILE"
+                return 1
             fi
-        done
+        fi
+        echo -e "\033[1;32m推送完成\033[1;0m"
     else
         echo -e "\033[1;33m未检测到远程分支，跳过推送步骤\033[0m"
     fi
@@ -445,13 +377,13 @@ main() {
 
     # 验证分支
     if ! branch=$(git branch --show-current); then
-        echo -e "\033[1;31m仓库信息异常，请检查\033[1;0m"
+        echo -e "\033[1;31m仓库信息异常, 请检查\033[1;0m"
         return 1
     fi
 
     case $branch in
         'develop'|'test'|'release'|'main'|'master'|'partner')
-            echo -e "\033[1;31m当前 $branch 为非任务分支，请切换到您的任务分支\033[1;0m"
+            echo -e "\033[1;31m当前 $branch 为非任务分支 , 请切换到您的任务分支\033[1;0m"
             return 1
             ;;
     esac
@@ -510,7 +442,7 @@ main() {
             git ls-remote --heads origin main 2>/dev/null | grep -q main && echo "main" || \
             echo "master")
         messages+=("$(git log --pretty=format:'%s' -1 origin/"${default_branch}" 2>/dev/null || git rev-parse --abbrev-ref HEAD || echo "Update")")
-        echo -e "\033[1;34m没有指定 -m 参数，将使用最后一次提交信息\033[1;0m"
+        echo -e "\033[1;34m没有指定 -m 参数, 将使用最后一次提交信息\033[1;0m"
     fi
 
     [[ -n "$message_append" ]] && messages+=("$message_append")
@@ -533,7 +465,7 @@ main() {
     if [[ $git_status != *"nothing to commit"* && $git_status != *"无文件要提交，干净的工作区"* ]]; then
         echo "$git_status"
         if ! (git add --all && git commit -m "$messages_str"); then
-            echo -e "\033[1;31m提交失败，请检查\033[1;0m"
+            echo -e "\033[1;31m提交失败, 请检查\033[1;0m"
             exit 1
         fi
     fi
@@ -548,7 +480,7 @@ main() {
     echo -e "\033[1;34m切换到 $target \033[1;0m"
     branch_switched=false
     if $has_remote_branch; then
-        echo -e "\033[1;34m检测到远程分支，删除本地 $target \033[1;0m"
+        echo -e "\033[1;34m检测到远程分支, 删除本地 $target \033[1;0m"
         git branch -D "$target" 2>/dev/null || true
         if ! git checkout "$target"; then
             echo -e "\033[1;31m切换分支失败\033[1;0m"
