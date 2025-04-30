@@ -308,9 +308,8 @@ do_rsync() {
             return 1
         fi
 
-        # 检查文件数量，提示全量同步
-        file_count=$(wc -l < "$temp_file_list" | tr -d '[:space:]') # 修复：去除空格和不可见字符
-        if [ "$file_count" -gt 500 ]; then
+        file_count=$(wc -l < "$temp_file_list" | tr -d '[:space:]')
+        if [ "$file_count" -gt 1000 ]; then
             echo -e "\033[1;33m警告：检测到大量变更文件（$file_count个），建议使用全量同步（all参数）以提高稳定性\033[0m"
         fi
 
@@ -319,30 +318,49 @@ do_rsync() {
             return 0
         fi
 
-        # 输出文件列表，修复空格问题
-        handle_count=100
+        # 分离显示和分批逻辑
+        display_count=100
+        batch_threshold=500
         printf "\033[1;34m待同步的文件列表（共 %d 个）:\033[0m\n" "$file_count" # 修复：使用printf精确控制格式
         echo "--------------------------------"
-        head -n "$handle_count" "$temp_file_list" # 修复：引用变量
-        [ "$file_count" -gt "$handle_count" ] && printf "...（仅显示前 %d 个文件）\n" "$handle_count" # 修复：使用printf
+        head -n "$display_count" "$temp_file_list"
+        [ "$file_count" -gt "$display_count" ] && printf "...（仅显示前 %d 个文件）\n" "$display_count"
         echo "--------------------------------"
 
-        # 分批处理
-        split -l "$handle_count" "$temp_file_list" "${temp_file_list}_part_" # 修复：引用变量
-        if [ "$file_count" -gt "$handle_count" ]; then
+        # 动态分批处理
+        if [ "$file_count" -gt "$batch_threshold" ]; then
+            split -l "$batch_threshold" "$temp_file_list" "${temp_file_list}_part_"
             echo -e "\033[1;34m开始增量同步（分批处理）...\033[0m"
+            for part in "${temp_file_list}_part_"*; do
+                if [ ! -f "$part" ]; then
+                    echo -e "\033[1;33m无文件需要同步\033[0m"
+                    break
+                fi
+                declare -a rsync_opts=(
+                    "${base_rsync_opts[@]}"
+                    --files-from="$part"
+                )
+                max_attempts=3
+                for ((attempt=1; attempt<=max_attempts; attempt++)); do
+                    if rsync_output=$(rsync "${rsync_opts[@]}" \
+                        "$LOCAL_DIR/" "$REMOTE_USER@$REMOTE_IP:$REMOTE_DIR/" 2>&1); then
+                        echo "$rsync_output"
+                        break
+                    else
+                        echo "$rsync_output" >> "$RSYNC_ERROR_FILE"
+                        if [ $attempt -eq $max_attempts ]; then
+                            handle_rsync_error "$rsync_output" $?
+                            return 1
+                        fi
+                        echo -e "\033[1;33m第$attempt次同步（部分文件）失败，尝试重试...\033[0m"
+                    fi
+                done
+            done
         else
             echo -e "\033[1;34m开始增量同步...\033[0m"
-        fi
-
-        for part in "${temp_file_list}_part_"*; do
-            if [ ! -f "$part" ]; then
-                echo -e "\033[1;33m无文件需要同步\033[0m"
-                break
-            fi
             declare -a rsync_opts=(
                 "${base_rsync_opts[@]}"
-                --files-from="$part"
+                --files-from="$temp_file_list"
             )
             max_attempts=3
             for ((attempt=1; attempt<=max_attempts; attempt++)); do
@@ -356,37 +374,31 @@ do_rsync() {
                         handle_rsync_error "$rsync_output" $?
                         return 1
                     fi
-                    echo -e "\033[1;33m第$attempt次同步（部分文件）失败，尝试重试...\033[0m"
+                    echo -e "\033[1;33m第$attempt次同步失败，尝试重试...\033[0m"
                 fi
             done
-        done
+        fi
     fi
 
-    # 统一的权限设置逻辑，分批处理
-    echo -e "\033[1;34m设置权限...\033[0m"
+    echo -e "\033[1;34m设置权限（后台执行）...\033[0m"
     ssh_cmd="cd '$REMOTE_DIR' && {
         find . -type d -exec chmod 755 {} + &
         find . -type f $special_perm -maxdepth 5 -exec chmod 644 {} + &
+        find . $special_perm -maxdepth 5 -exec chown www:www {} + &
         wait
-        find . $special_perm -maxdepth 5 -exec chown www:www {} +
     }"
 
-    # 后台运行 SSH 命令
+    SSH_ERROR_FILE=$(mktemp)
     ssh -o ControlPath="~/.ssh/controlmasters/%r@%h:%p" \
         -p "$PORT" \
         "$REMOTE_USER@$REMOTE_IP" \
-        "$ssh_cmd" 2>"$RSYNC_ERROR_FILE" &
+        "$ssh_cmd" 2>"$SSH_ERROR_FILE" &
     SSH_PID=$!
 
-    # 等待后台进程完成并检查退出状态
-    if ! wait $SSH_PID; then
-        echo -e "\033[1;31m[ERROR] 权限设置失败\033[0m" >&2
-        cat "$RSYNC_ERROR_FILE" >&2
-        echo "1" > "$SYNC_STATUS_FILE"
-        return 1
-    fi
+    echo "$SSH_PID" > "$CACHE_DIR/ssh_pid"
+    echo "$SSH_ERROR_FILE" > "$CACHE_DIR/ssh_error_file"
 
-    echo -e "\033[1;32m同步完成\033[0m"
+    echo -e "\033[1;32m同步完成（权限设置将在后台继续）\033[0m"
     echo "0" > "$SYNC_STATUS_FILE"
     timer_end "rsync同步"
 }
