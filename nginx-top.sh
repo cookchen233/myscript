@@ -14,9 +14,9 @@ else
     LOG_DIR="${1:-/var/log/nginx}"
 fi
 
-# 检查 LOG_DIR 是否存在
-if [ ! -d "$LOG_DIR" ]; then
-    echo "错误：日志目录 $LOG_DIR 不存在" >&2
+# 检查 LOG_DIR 是否存在（文件或目录）
+if [ ! -e "$LOG_DIR" ]; then
+    echo "错误：路径 $LOG_DIR 不存在" >&2
     exit 1
 fi
 

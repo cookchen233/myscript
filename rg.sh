@@ -1,3 +1,8 @@
+
+# 脚本用途：rg封装
+# 依赖：fzf bat
+# 使用示例：rg <关键词> [-g 搜文件名而非内容] [目录 默认当前]
+
 rg() {
     local query=""
     local dir="."
