@@ -57,13 +57,13 @@ ss() {
             echo "Yarn build failed" >&2
             return 1
         fi
-        if ! ~/Coding/myscript/sy/syp.sh master all "$@"; then
-            echo "syp.sh failed" >&2
+        if ! ~/Coding/myscript/sy/sy.sh master all "$@"; then
+            echo "sy.sh failed" >&2
             return 1
         fi
     else
-        if ! ~/Coding/myscript/sy/syp.sh master "$@"; then
-            echo "syp.sh failed" >&2
+        if ! ~/Coding/myscript/sy/sy.sh master "$@"; then
+            echo "sy.sh failed" >&2
             return 1
         fi
     fi

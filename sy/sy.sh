@@ -241,9 +241,10 @@ do_rsync() {
     done
 
     # 检查远程磁盘空间
-    if ! ssh -o ControlPath="~/.ssh/controlmasters/%r@%h:%p" -p "$PORT" "$REMOTE_USER@$REMOTE_IP" \
-        "df -h '$REMOTE_DIR' | grep -q '100%'"; then
-        echo -e "\033[1;31m错误: 远程磁盘空间不足，请检查服务器磁盘\033[0m"
+    disk_usage=$(ssh -o ControlPath="~/.ssh/controlmasters/%r@%h:%p" -p "$PORT" "$REMOTE_USER@$REMOTE_IP" \
+    "df -h '$REMOTE_DIR' | tail -n 1 | awk '{print \$5}' | tr -d '%'")
+    if [ "$disk_usage" -ge 95 ]; then
+        echo -e "\033[1;31m错误: 远程磁盘空间使用率过高（$disk_usage%），请检查服务器磁盘\033[0m"
         echo "1" > "$SYNC_STATUS_FILE"
         return 1
     fi
@@ -323,7 +324,7 @@ do_rsync() {
         echo "--------------------------------"
 
         # 分割文件列表，处理大量文件
-        split -l 1000 "$temp_file_list" "${temp_file_list}_part_" # 每1000行一个文件
+        split -l 50 "$temp_file_list" "${temp_file_list}_part_" # 每50行一个文件
         echo -e "\033[1;34m开始增量同步（分批处理）...\033[0m"
         max_attempts=3
         for part in "${temp_file_list}_part_"*; do
