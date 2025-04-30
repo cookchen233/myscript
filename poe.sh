@@ -14,7 +14,7 @@ open -a 'Google Chrome.app'
 
 #     -- 复制提示词
 #     set ori_clipboard_text to (the clipboard as text)
-#     set outputText to "I want you to act as an English teacher. When I write a sentence, first respond with 'Better:' followed by the improved version(s), focusing only on word choice and structure (ignore capitalization and punctuation errors). If my sentence is already correct, respond with 'Correct!'. Then provide the answer to my question. My first sentence is: 
+#     set outputText to "I want you to act as an English teacher. When I write a sentence, first reply with an improved version starting with 'Better:', focusing only on phrasing, grammar, and idiomatic usage (ignore capitalization, punctuation errors, and obvious spelling mistakes). If my sentence is already correct (idiomatic/natural), reply 'Correct!', and then answer my question. Remember, you must do this for every sentence I post. My first sentence is: 
 # "
 #     set the clipboard to {text:(outputText as string), Unicode text:outputText}
 #     -- 粘贴提示词

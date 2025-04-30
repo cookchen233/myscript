@@ -1,11 +1,3 @@
-refresh_smb() {
-    sudo kill -HUP `ps -ax | grep mds | grep -v grep | awk '{print $1}'`
-    echo "SMB cache refreshed"
-}
-chpwd(){
-    CLICOLOR_FORCE=1 ls -tr
-}
-
 bg_black="\033[40m"
 bg_red="\033[41m"
 bg_green="\033[42m"
@@ -29,12 +21,27 @@ set_bold="\033[1m"
 set_underline="\033[4m"
 set_flash="\033[5m"
 
+refresh_smb() {
+    sudo kill -HUP `ps -ax | grep mds | grep -v grep | awk '{print $1}'`
+    echo "SMB cache refreshed"
+}
+chpwd(){
+    CLICOLOR_FORCE=1 ls -tr
+}
+
+if [[ -n $PS1 ]]; then
+  alias ls='eza --color=auto --group-directories-first'
+  alias ll='eza --long --all --group --icons'
+  alias la='eza --all --group-directories-first'
+  alias rr="trash"
+  alias rm="echo 'Please use rr instead of rm';false"
+fi
+
 alias v='open -a /Applications/Visual\ Studio\ Code.app'
-alias sc="cd ~/Coding/myscript"
-alias co="cd ~/Coding"
-alias dn="cd ~/Downloads"
-# alias rr="trash"
-# alias rm="echo 'Please use rr instead of rm';false"
+alias my="cd ~/Coding/myscript"
+alias cod="cd ~/Coding"
+alias down="cd ~/Downloads"
+
 alias vs="networksetup -showpppoestatus Atlantic"
 alias vd="networksetup -disconnectpppoeservice 'Atlantic'"
 alias vv="~/Coding/myscript/connect_to_vpn.sh"
@@ -44,7 +51,6 @@ alias na="pbpaste | sed 's/^[[:space:]]*\*//g' | pbcopy && echo 'successfully pr
 #alias nb="git fetch --all && git fetch -p origin && git checkout origin/main -b"
 alias nb="git checkout main -b"
 alias dv="~/Coding/myscript/open-all-device-url.sh"
-
 alias gen='~/Coding/myscript/alphagen/main.py'
 alias syp='~/Coding/myscript/sy/syp.sh'
 alias sy='~/Coding/myscript/sy/sy.sh'
@@ -86,7 +92,7 @@ function tanlog() {
 }
 p&&/^trace_id:/{p=0}
 p {
-    printf "\033[36m%s\033[0m\n",$0
+    printf "\033[36m%s\033[0m\n\n",$0
 }'
 }
 
@@ -120,6 +126,7 @@ test_key() {
 : ${site:=20}
 source ~/Coding/myscript/mysql_query.sh
 source ~/Coding/myscript/clean_orphans.sh
+source ~/Coding/myscript/server-log.sh
 # source ~/Coding/myscript/ddd.sh
 alias dm=delete_member_and_related
 alias dmcc=check_and_clean_orphans
@@ -129,44 +136,3 @@ qm() {
     site="$site" q m
 }
 alias ddd='~/Coding/myscript/ddd.sh'
-
-SERVER="root@lc.server.host"
-BASE_PATH="/www/wwwroot/api.13012345822.com/runtime"
-DOWNLOAD_DIR=~/Downloads
-EDITOR="/Applications/Visual Studio Code.app"
-
-getlog() {
-    # Use provided service or empty string
-    local SERVICE=${1:-}
-    # Use provided date or fallback to today
-    local TARGET_DATE=${2:-$(date +%Y%m%d)}
-    local MONTH=${TARGET_DATE:0:6}
-    local DAY=${TARGET_DATE:6:2}
-    local PATH_SUFFIX=""
-    
-    # Add service path if provided
-    [ -n "$SERVICE" ] && PATH_SUFFIX="/$SERVICE"
-    
-    /usr/bin/scp ${SERVER}:${BASE_PATH}${PATH_SUFFIX}/${MONTH}${DAY}.log ${DOWNLOAD_DIR}/ &&
-    /usr/bin/open -a "${EDITOR}" ${DOWNLOAD_DIR}/${MONTH}${DAY}.log
-}
-
-apilog() {
-    getlog "api/log" "$1"
-}
-
-conslog() {
-    getlog "log" "$1"
-}
-
-reqlog() {
-    getlog "log/request" "$1"
-}
-
-greqlog() {
-    getlog "log/global-request" "$1"
-}
-
-admlog() {
-    getlog "admin/log" "$1"
-}
