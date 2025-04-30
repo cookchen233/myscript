@@ -318,8 +318,10 @@ do_rsync() {
             return 0
         fi
 
+        echo -e "\033[1;34m开始增量同步...\033[0m"
+
         # 分离显示和分批逻辑
-        display_count=100
+        display_count=20
         batch_threshold=500
         printf "\033[1;34m待同步的文件列表（共 %d 个）:\033[0m\n" "$file_count" # 修复：使用printf精确控制格式
         echo "--------------------------------"
@@ -330,7 +332,7 @@ do_rsync() {
         # 动态分批处理
         if [ "$file_count" -gt "$batch_threshold" ]; then
             split -l "$batch_threshold" "$temp_file_list" "${temp_file_list}_part_"
-            echo -e "\033[1;34m开始增量同步（分批处理）...\033[0m"
+            echo -e "\033[1;34m文件超过${batch_threshold}个，分批处理...\033[0m"
             for part in "${temp_file_list}_part_"*; do
                 if [ ! -f "$part" ]; then
                     echo -e "\033[1;33m无文件需要同步\033[0m"
@@ -357,7 +359,6 @@ do_rsync() {
                 done
             done
         else
-            echo -e "\033[1;34m开始增量同步...\033[0m"
             declare -a rsync_opts=(
                 "${base_rsync_opts[@]}"
                 --files-from="$temp_file_list"
