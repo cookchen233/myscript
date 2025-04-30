@@ -43,13 +43,8 @@ PAST_TIME=$((CURRENT_TIME - TIME_RANGE * 60))
 CURRENT_TIME_STR=$(date -j -f "%s" "${CURRENT_TIME}" "+%d/%b/%Y:%H:%M:%S" 2>/dev/null)
 PAST_TIME_STR=$(date -j -f "%s" "${PAST_TIME}" "+%d/%b/%Y:%H:%M:%S" 2>/dev/null)
 
-# 生成时间范围的正则表达式（精确到秒）
-TIME_REGEX=""
-for i in $(seq 0 $((TIME_RANGE * 60))); do
-    TIME_STR=$(date -j -f "%s" $((PAST_TIME + i)) "+%d/%b/%Y:%H:%M:%S" 2>/dev/null)
-    TIME_REGEX="${TIME_REGEX}${TIME_STR}|"
-done
-TIME_REGEX="${TIME_REGEX%|}"
+# 生成时间范围的正则表达式（精确到分钟）
+TIME_REGEX=$(seq -f "${PAST_TIME_STR:0:11}:%02.0f" 0 $TIME_RANGE | paste -sd '|' -)
 # 调试：输出时间范围和正则
 # echo "Debug: Analyzing logs from $PAST_TIME_STR to $CURRENT_TIME_STR"
 # echo "Debug: Time regex: $TIME_REGEX"
@@ -79,10 +74,10 @@ find "${LOG_DIR}" -type f \( -name "access.log" -o -name "access.log.*.gz" \) -p
                     url = url_arr[1]
                 }
                 if (time_str && url) {
-                    print domain "\t" url "\t" time_str
+                    print domain "\t" url "\t" time_str > "/tmp/temp_output.txt"
                 }
             }
-        }' >> "${TEMP_FILE}"
+        }' 
     else
         command rg --no-filename --text "^[0-9.]+.*\[(${TIME_REGEX}).*\].*\"(GET|POST) [^ \"]+\sHTTP" "${log_file}" | awk -v domain="${domain}" '
         {
@@ -98,15 +93,15 @@ find "${LOG_DIR}" -type f \( -name "access.log" -o -name "access.log.*.gz" \) -p
                     url = url_arr[1]
                 }
                 if (time_str && url) {
-                    print domain "\t" url "\t" time_str
+                    print domain "\t" url "\t" time_str > "/tmp/temp_output.txt"
                 }
             }
-        }' >> "${TEMP_FILE}"
+        }'
     fi
 done
 
 # 检查临时文件是否为空
-if [ ! -s "${TEMP_FILE}" ]; then
+if [ ! -s "/tmp/temp_output.txt" ]; then
     echo "警告：没有找到符合时间范围的日志记录（${PAST_TIME_STR} 到 ${CURRENT_TIME_STR}）"
     if [ -z "$TEST_DATE" ]; then
         echo "提示：您的日志可能较旧，请使用 --test-date 指定分析时间，例如："
@@ -114,7 +109,7 @@ if [ ! -s "${TEMP_FILE}" ]; then
     fi
     # 调试：输出临时文件内容
     # echo "Debug: Temporary file contents:"
-    # cat "${TEMP_FILE}"
+    # cat "/tmp/temp_output.txt"
     exit 0
 fi
 
@@ -144,20 +139,20 @@ END {
         print "警告：没有符合时间范围的记录可统计"
         exit 0
     }
-    # 打印表头
-    printf "%-30s %-50s %-10s %-20s\n", "Domain", "URL", "Count", "Latest Time"
-    printf "%-30s %-50s %-10s %-20s\n", "------", "---", "-----", "-----------"
-    # 存储结果到临时文件
+    # 仅将数据写入最终文件，不包括表头
     for (key in count) {
         split(key, arr, "\t")
-        printf "%-30s %-50s %-10d %-20s\n", arr[1], arr[2], count[key], latest_time[key] > "/tmp/final_output.txt"
+        printf "%-30s %-50s %-10d %-20s\n", arr[1], arr[2], count[key], latest_time[key] > "'"${FINAL_FILE}"'"
     }
-}' "${TEMP_FILE}"
+}' "/tmp/temp_output.txt"
 
 # 排序并输出
-if [ -s "/tmp/final_output.txt" ]; then
-    sort -k3 -nr "/tmp/final_output.txt" | head -n "${TOP_N}"
-    rm -f "/tmp/final_output.txt"
+if [ -s "${FINAL_FILE}" ]; then
+    # 打印表头
+    printf "%-30s %-50s %-10s %-20s\n" "Domain" "URL" "Count" "Latest Time"
+    printf "%-30s %-50s %-10s %-20s\n" "------" "---" "-----" "-----------"
+    # 排序数据并输出
+    sort -k3 -nr "${FINAL_FILE}" | head -n "${TOP_N}"
 else
     echo "警告：没有生成最终输出，可能由于处理错误"
 fi
