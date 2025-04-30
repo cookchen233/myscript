@@ -41,20 +41,7 @@ if [[ -n $PS1 ]]; then
     }
     alias curl=curlj
 
-    rg() {
-        # 保存搜索关键字（所有参数）
-        local query="$@"
-        # 检查是否需要直接输出（如管道或重定向）
-        if [[ -p /dev/stdout || ! -t 1 ]]; then
-            command rg "$@"
-        else
-            # 运行 rg 并通过 fzf 显示，预览窗口使用 rg 提供关键字高亮
-            command rg --column --line-number --no-heading --color=always --smart-case "$@" | fzf --ansi --delimiter : \
-            --preview 'rg --color=always --smart-case --context=10 "'"$query"'" {1} | bat --color=always --style=numbers' \
-            --preview-window 'up,60%,border-bottom' \
-            --bind 'enter:become(vim {1} +{2})'
-        fi
-    }
+    source ~/Coding/myscript/rg.sh
 fi
 
 # basics
