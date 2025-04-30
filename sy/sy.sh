@@ -241,13 +241,13 @@ do_rsync() {
     done
 
     # 检查远程磁盘空间
-    disk_usage=$(ssh -o ControlPath="~/.ssh/controlmasters/%r@%h:%p" -p "$PORT" "$REMOTE_USER@$REMOTE_IP" \
-        "df -h '$REMOTE_DIR' | tail -n 1 | awk '{print \$5}' | tr -d '%'")
-    if [ "$disk_usage" -ge 95 ]; then
-        echo -e "\033[1;31m错误: 远程磁盘空间使用率过高（$disk_usage%），请检查服务器磁盘\033[0m"
-        echo "1" > "$SYNC_STATUS_FILE"
-        return 1
-    fi
+#    disk_usage=$(ssh -o ControlPath="~/.ssh/controlmasters/%r@%h:%p" -p "$PORT" "$REMOTE_USER@$REMOTE_IP" \
+#        "df -h '$REMOTE_DIR' | tail -n 1 | awk '{print \$5}' | tr -d '%'")
+#    if [ "$disk_usage" -ge 95 ]; then
+#        echo -e "\033[1;31m错误: 远程磁盘空间使用率过高（$disk_usage%），请检查服务器磁盘\033[0m"
+#        echo "1" > "$SYNC_STATUS_FILE"
+#        return 1
+#    fi
 
     if [ "$is_all" == true ]; then
         # 初始化排除项
