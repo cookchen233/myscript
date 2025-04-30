@@ -228,7 +228,7 @@ do_rsync() {
         --no-owner
         --no-group
         --compress-level=9
-        --timeout=300 # 设置rsync超时时间
+        --timeout=300
     )
 
     # 构建special_perm条件
@@ -242,7 +242,7 @@ do_rsync() {
 
     # 检查远程磁盘空间
     disk_usage=$(ssh -o ControlPath="~/.ssh/controlmasters/%r@%h:%p" -p "$PORT" "$REMOTE_USER@$REMOTE_IP" \
-    "df -h '$REMOTE_DIR' | tail -n 1 | awk '{print \$5}' | tr -d '%'")
+        "df -h '$REMOTE_DIR' | tail -n 1 | awk '{print \$5}' | tr -d '%'")
     if [ "$disk_usage" -ge 95 ]; then
         echo -e "\033[1;31m错误: 远程磁盘空间使用率过高（$disk_usage%），请检查服务器磁盘\033[0m"
         echo "1" > "$SYNC_STATUS_FILE"
@@ -279,7 +279,7 @@ do_rsync() {
 
         # 执行文件同步
         echo -e "\033[1;34m开始全量同步:\n$LOCAL_DIR => $REMOTE_DIR\033[0m"
-        max_attempts=3 # rsync重试机制
+        max_attempts=3
         for ((attempt=1; attempt<=max_attempts; attempt++)); do
             if rsync_output=$(rsync "${rsync_opts[@]}" \
                 "$LOCAL_DIR/" "$REMOTE_USER@$REMOTE_IP:$REMOTE_DIR/" 2>&1); then
@@ -305,11 +305,9 @@ do_rsync() {
         fi
 
         # 检查文件数量，提示全量同步
-        file_count=$(wc -l < "$temp_file_list")
-        if [ "$file_count" -gt 1000 ]; then
+        file_count=$(wc -l < "$temp_file_list" | tr -d '[:space:]') # 修复：去除空格和不可见字符
+        if [ "$file_count" -gt 500 ]; then
             echo -e "\033[1;33m警告：检测到大量变更文件（$file_count个），建议使用全量同步（all参数）以提高稳定性\033[0m"
-            # 可选：自动切换到全量同步
-            # is_all=true
         fi
 
         if [ "$file_count" -eq 0 ]; then
@@ -317,16 +315,22 @@ do_rsync() {
             return 0
         fi
 
-        echo -e "\033[1;34m待同步的文件列表（共$file_count个）:\033[0m"
+        # 输出文件列表，修复空格问题
+        handle_count=100
+        printf "\033[1;34m待同步的文件列表（共 %d 个）:\033[0m\n" "$file_count" # 修复：使用printf精确控制格式
         echo "--------------------------------"
-        head -n 50 "$temp_file_list" # 限制显示，避免过多输出
-        [ "$file_count" -gt 50 ] && echo -e "...（仅显示前50个文件）"
+        head -n "$handle_count" "$temp_file_list" # 修复：引用变量
+        [ "$file_count" -gt "$handle_count" ] && printf "...（仅显示前 %d 个文件）\n" "$handle_count" # 修复：使用printf
         echo "--------------------------------"
 
-        # 分割文件列表，处理大量文件
-        split -l 50 "$temp_file_list" "${temp_file_list}_part_" # 每50行一个文件
-        echo -e "\033[1;34m开始增量同步（分批处理）...\033[0m"
-        max_attempts=3
+        # 分批处理
+        split -l "$handle_count" "$temp_file_list" "${temp_file_list}_part_" # 修复：引用变量
+        if [ "$file_count" -gt "$handle_count" ]; then
+            echo -e "\033[1;34m开始增量同步（分批处理）...\033[0m"
+        else
+            echo -e "\033[1;34m开始增量同步...\033[0m"
+        fi
+
         for part in "${temp_file_list}_part_"*; do
             if [ ! -f "$part" ]; then
                 echo -e "\033[1;33m无文件需要同步\033[0m"
@@ -336,6 +340,7 @@ do_rsync() {
                 "${base_rsync_opts[@]}"
                 --files-from="$part"
             )
+            max_attempts=3
             for ((attempt=1; attempt<=max_attempts; attempt++)); do
                 if rsync_output=$(rsync "${rsync_opts[@]}" \
                     "$LOCAL_DIR/" "$REMOTE_USER@$REMOTE_IP:$REMOTE_DIR/" 2>&1); then
@@ -357,9 +362,9 @@ do_rsync() {
     echo -e "\033[1;34m设置权限...\033[0m"
     ssh_cmd="cd '$REMOTE_DIR' && {
         find . -type d -exec chmod 755 {} + &
-        find . -type f $special_perm -maxdepth 5 -exec chmod 644 {} + & # 限制深度
+        find . -type f $special_perm -maxdepth 5 -exec chmod 644 {} + &
         wait
-        find . $special_perm -maxdepth 5 -exec chown www:www {} + # 限制深度
+        find . $special_perm -maxdepth 5 -exec chown www:www {} +
     }"
 
     if ! ssh -o ControlPath="~/.ssh/controlmasters/%r@%h:%p" \
