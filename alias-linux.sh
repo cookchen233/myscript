@@ -16,4 +16,4 @@ fi
 alias adm="cd /www/wwwroot/api.admin.13012345822.com"
 alias api="cd /www/wwwroot/api.13012345822.com"
 alias www="cd /www/wwwroot"
-alias v="vi"
+alias v="vim"

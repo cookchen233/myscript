@@ -30,18 +30,55 @@ chpwd(){
 }
 
 if [[ -n $PS1 ]]; then
-  alias ls='eza --color=auto --group-directories-first'
-  alias ll='eza --long --all --group --icons'
-  alias la='eza --all --group-directories-first'
-  alias rr="trash"
-  alias rm="echo 'Please use rr instead of rm';false"
+    alias ls='eza --color=auto --group-directories-first'
+    alias ll='eza --long --all --group --icons'
+    alias la='eza --all --group-directories-first'
+    alias rr='trash'
+    alias rm='echo "Use rr (trash) instead of rm to avoid permanent deletion."; false'
+
+    curlj() {
+        /usr/bin/curl "$@" | jq -C . 2>/dev/null || /usr/bin/curl "$@"
+    }
+    alias curl=curlj
+
+    rg() {
+        # 保存搜索关键字（所有参数）
+        local query="$@"
+        # 检查是否需要直接输出（如管道或重定向）
+        if [[ -p /dev/stdout || ! -t 1 ]]; then
+            command rg "$@"
+        else
+            # 运行 rg 并通过 fzf 显示，预览窗口使用 rg 提供关键字高亮
+            command rg --column --line-number --no-heading --color=always --smart-case "$@" | fzf --ansi --delimiter : \
+            --preview 'rg --color=always --smart-case --context=10 "'"$query"'" {1} | bat --color=always --style=numbers' \
+            --preview-window 'up,60%,border-bottom' \
+            --bind 'enter:become(vim {1} +{2})'
+        fi
+    }
 fi
 
+# basics
 alias v='open -a /Applications/Visual\ Studio\ Code.app'
 alias my="cd ~/Coding/myscript"
 alias cod="cd ~/Coding"
 alias down="cd ~/Downloads"
+alias py='python3'
 
+# basic tools
+alias gen='~/Coding/myscript/alphagen/main.py'
+alias sy='~/Coding/myscript/sy/sy.sh'
+alias qr='qrencode -t ANSIUTF8'
+alias cc='git checkout -- . && git clean -fd'
+
+function ag() {
+    if [[ "$1" == "-l" ]]; then
+        command ag -l "${@:2}" | fzf | xargs o
+    else
+        command ag "$@"
+    fi
+}
+
+# features
 alias vs="networksetup -showpppoestatus Atlantic"
 alias vd="networksetup -disconnectpppoeservice 'Atlantic'"
 alias vv="~/Coding/myscript/connect_to_vpn.sh"
@@ -51,13 +88,7 @@ alias na="pbpaste | sed 's/^[[:space:]]*\*//g' | pbcopy && echo 'successfully pr
 #alias nb="git fetch --all && git fetch -p origin && git checkout origin/main -b"
 alias nb="git checkout main -b"
 alias dv="~/Coding/myscript/open-all-device-url.sh"
-alias gen='~/Coding/myscript/alphagen/main.py'
-alias syp='~/Coding/myscript/sy/syp.sh'
-alias sy='~/Coding/myscript/sy/sy.sh'
 alias genm='~/Coding/myscript/genmenu.sh'
-alias py='python3'
-alias qr='qrencode -t ANSIUTF8'
-alias cc='git checkout -- . && git clean -fd'
 
 alias sslc='ssh root@lc.server.host -t "tmux attach || tmux"'
 
@@ -67,21 +98,6 @@ source ~/Coding/myscript/ss.sh
 alias lf='function _logwatch() { ssh root@lc.server.host "tail -F $1"; }; _logwatch'
 # 带 lnav 的版本
 alias lnf='function _logwatch() { ssh root@lc.server.host "tail -F $1" | lnav; }; _logwatch'
-
-
-
-curlj() {
-    /usr/bin/curl -s "$@" | jq -C . 2>/dev/null || /usr/bin/curl -s "$@"
-}
-alias curl=curlj
-
-function ag() {
-    if [[ "$1" == "-l" ]]; then
-        command ag -l "${@:2}" | fzf | xargs o
-    else
-        command ag "$@"
-    fi
-}
 
 function tanlog() {
     tail -f /Users/Chen/Coding/myscript/notification-server/main.log | awk '
