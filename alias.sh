@@ -35,6 +35,7 @@ if [[ -n $PS1 ]]; then
     alias la='eza --all --group-directories-first'
     alias rr='trash'
     alias rm='echo "Use rr (trash) instead of rm to avoid permanent deletion."; false'
+    alias cp='/opt/homebrew/bin/gcp -v'
 
     curlj() {
         /usr/bin/curl "$@" | jq -C . 2>/dev/null || /usr/bin/curl "$@"
@@ -66,6 +67,13 @@ function ag() {
 }
 
 # features
+# download to local dir
+# getfile() { IFS=':' read -r SERVER FILE <<< "$1" && ssh "$SERVER" "[ -f \"$FILE\" ]" && scp "$SERVER:$FILE" ~/Downloads/ && open -a "Visual Studio Code" ~/Downloads/"$(basename "$FILE")"; }
+getfile() { IFS=':' read -r SERVER FILE <<< "$1" && TMP=$(mktemp) && ssh "$SERVER" "[ -f \"$FILE\" ]" && scp "$SERVER:$FILE" "$TMP" && open -a "Visual Studio Code" "$TMP" & sleep 1 && rm -f "$TMP"; }
+putfile() { IFS=':' read -r SERVER REMOTE_FILE <<< "$1" && LOCAL_FILE="${2:-$(basename "$REMOTE_FILE")}" && [ -f "$LOCAL_FILE" ] && ssh "$SERVER" "[ -d \"$(dirname "$REMOTE_FILE")\" ]" && scp -C "$LOCAL_FILE" "$SERVER:$REMOTE_FILE"; }
+
+# rsync
+#putfile() { IFS=':' read -r SERVER REMOTE_FILE <<< "$1" && LOCAL_FILE="${2:-$(basename "$REMOTE_FILE")}" && [ -f "$LOCAL_FILE" ] && ssh "$SERVER" "[ -d \"$(dirname "$REMOTE_FILE")\" ]" && rsync -avzuP "$LOCAL_FILE" "$SERVER:$REMOTE_FILE"; }
 alias vs="networksetup -showpppoestatus Atlantic"
 alias vd="networksetup -disconnectpppoeservice 'Atlantic'"
 alias vv="~/Coding/myscript/connect_to_vpn.sh"
@@ -79,7 +87,7 @@ alias genm='~/Coding/myscript/genmenu.sh'
 
 alias sslc='ssh root@lc.server.host -t "tmux attach || tmux"'
 
-source ~/Coding/myscript/ss.sh
+source ~/Coding/myscript/ww.sh
 # uniapp通常有vite.config.ts, 后台管理系统只有vite.config.js
 
 alias lf='function _logwatch() { ssh root@lc.server.host "tail -F $1"; }; _logwatch'

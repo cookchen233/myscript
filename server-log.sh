@@ -1,6 +1,11 @@
 #!/bin/bash
 
-# 下载并打开服务器日志
+# 脚本用途：从远程服务器下载指定日期的日志文件并在本地编辑器中打开
+# 依赖：ssh, scp, date, open, Visual Studio Code (或其他配置的编辑器)
+# 使用示例：./script.sh apilog [YYYYMMDD] [-s server:base_path]
+#           ./script.sh conslog 20250501
+#           ./script.sh reqlog -s user@otherserver:/path 20250501
+# ssh root@server.lc "[ -f /www/wwwroot/api.13012345822.com/runtime/api/log/20250501.log ]" && /usr/bin/scp root@server.lc:/www/wwwroot/api.13012345822.com/runtime/api/log/20250501.log ~/Downloads/ && /usr/bin/open -a "/Applications/Visual Studio Code.app" ~/Downloads/20250501.log
 
 SERVER_DIR="root@server.lc:/www/wwwroot/api.13012345822.com/runtime"
 DOWNLOAD_DIR=~/Downloads

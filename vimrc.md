@@ -23,8 +23,8 @@ nnoremap <leader>s :w<CR>
 nnoremap ss :w<CR>
 
 " 快速退出
-nnoremap <leader>q :q<CR>
-nnoremap qq :q<CR>
+nnoremap <leader>q :q!CR>
+nnoremap qq :q!<CR>
 
 " 快速保存并退出
 nnoremap <leader>w :wq<CR>

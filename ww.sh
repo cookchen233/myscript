@@ -37,7 +37,7 @@ bbyif() {
 }
 
 # 根据项目类型执行构建和部署
-ss() {
+ww() {
     if [ -f "vite.config.ts" ]; then
         if ! bb "$@"; then
             echo "bb failed" >&2
@@ -70,11 +70,11 @@ ss() {
 }
 
 # 配合快捷键并显示通知
-ssn() {
+wwn() {
     local date_folder="$HOME/Coding/logs/$(date +%Y%m%d)"
     mkdir -p "$date_folder"
 
-    local log_file="$date_folder/ss_log_$(date +%Y%m%d_%H%M%S).log"
+    local log_file="$date_folder/ww_log_$(date +%Y%m%d_%H%M%S).log"
 
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Saving files with Cmd + S" > "$log_file"
     osascript <<EOF >> "$log_file" 2>&1
@@ -85,16 +85,16 @@ EOF
 
     # 开始执行通知
     osascript <<EOF
-    display notification "Starting build and deploy" with title "myscript" subtitle "⏳ ss in progress" sound name "Funk"
+    display notification "Starting build and deploy" with title "myscript" subtitle "⏳ ww in progress" sound name "Funk"
 EOF
 
     # 执行命令并记录日志
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting deploy" >> "$log_file"
-    if ss "$1" >> "$log_file" 2>&1; then
+    if ww "$1" >> "$log_file" 2>&1; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Deploy succeeded" >> "$log_file"
         # 成功通知
         osascript <<EOF
-        display notification "Deploy completed. Log: $log_file" with title "myscript" subtitle "✅ ss complete" sound name "Bottle"
+        display notification "Deploy completed. Log: $log_file" with title "myscript" subtitle "✅ ww complete" sound name "Bottle"
 EOF
         exit 0
     else
@@ -105,7 +105,7 @@ EOF
         [ -z "$error_msg" ] && error_msg="Unknown error occurred"
         # 失败通知
         osascript <<EOF
-        display notification "Build or deploy failed: $error_msg. Log: $log_file" with title "myscript" subtitle "❗️ ss failed" sound name "Ping"
+        display notification "Build or deploy failed: $error_msg. Log: $log_file" with title "myscript" subtitle "❗️ ww failed" sound name "Ping"
 EOF
         open -a "Console" "$log_file"
         exit 1
@@ -115,14 +115,14 @@ EOF
 # 检查脚本是否被直接运行，而不是被 source
 if [[ "$0" == "${(%):-%x}" && "${ZSH_EVAL_CONTEXT:-}" != *"file"* ]]; then
     if [[ "$1" == "1" ]]; then
-        cd ~/Coding/phpcode && ssn
+        cd ~/Coding/phpcode && wwn
     elif [[ "$1" == "2" ]]; then
-        cd ~/Coding/admin-vue && ssn
+        cd ~/Coding/admin-vue && wwn
     elif [[ "$1" == "3" ]]; then
-        cd ~/Coding/bbv2-uniapp && ssn
+        cd ~/Coding/bbv2-uniapp && wwn
     else
         osascript <<EOF
-        display notification "Not support shortcut, just support option+1/2/3" with title "myscript" subtitle "❗️ ss failed" sound name "Ping"
+        display notification "Not support shortcut, just support option+1/2/3" with title "myscript" subtitle "❗️ ww failed" sound name "Ping"
 EOF
     fi
 fi

@@ -16,7 +16,7 @@ fi
 alias adm="cd /www/wwwroot/api.admin.13012345822.com"
 alias api="cd /www/wwwroot/api.13012345822.com"
 alias www="cd /www/wwwroot"
-alias v="vim"
+alias v="zellij run -f -c --pinned true --x 20% --y 0 --width 60% --height 60% -- vim"
 
 rg() {
     local query=""
