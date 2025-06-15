@@ -1,12 +1,11 @@
 <!-- src/pages/{{ module_name }}.{{ table_name|replace('_', '-')|replace('lc-'+module_name+'-', '') }}/list.vue -->
 <template>
     <enum-provider url="/common/options" :fields="[
-    'approvalStatusOptions',
   {%- for field in table_fields %}
   {%- if field.display_type == 'enum' %}
-    '{{ module_name }}.{{ field.field|snake_to_camel }}Options',
+    '{{ module_name }}.{{ field.field|snake_to_camel(true) }}Options',
   {%- elif field.display_type == 'data-id' %}
-    '{{ module_name }}.{{ module_name|snake_to_camel }}{{ field.data_id_props.options_name|snake_to_camel }}ModelOptions',
+    '{{ module_name }}.{{ module_name|snake_to_camel(true) }}{{ field.data_id_props.options_name|snake_to_camel(true) }}ModelOptions',
   {%- endif %}
   {%- endfor %}
   ]">
@@ -106,9 +105,9 @@
                     {%- if field.field != 'keywords' %}
                         <el-form-item label="{{ field.label }}" class="mt-[20px]">
                             {%- if field.search_type == 'enum' %}
-                                <enum-selector v-model="query.{{ field.field }}" field="{{ module_name }}.{{ field.field|snake_to_camel }}Options" class="w-[{{ field.width|default(200) }}px]" clearable :filterable="true" />
+                                <enum-selector v-model="query.{{ field.field }}" field="{{ module_name }}.{{ field.field|snake_to_camel(true) }}Options" class="w-[{{ field.width|default(200) }}px]" clearable :filterable="true" />
                             {%- elif field.search_type == 'data-id' %}
-                                <enum-selector v-model="query.{{ field.field }}" field="{{ module_name }}.{{ module_name|snake_to_camel }}{{ field.data_id_props.options_name|snake_to_camel }}ModelOptions" class="w-[{{ field.width|default(200) }}px]" clearable :filterable="true" />
+                                <enum-selector v-model="query.{{ field.field }}" field="{{ module_name }}.{{ module_name|snake_to_camel(true) }}{{ field.data_id_props.options_name|snake_to_camel(true) }}ModelOptions" class="w-[{{ field.width|default(200) }}px]" clearable :filterable="true" />
                             {%- elif field.search_type == 'daterange' %}
                                 <el-date-picker v-model="query.{{ field.field }}_range" type="daterange" range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期" value-format="YYYY-MM-DD" class="w-[360px]" clearable />
                             {%- elif field.search_type == 'numberrange' %}
@@ -294,7 +293,7 @@ const handleUpdate = async (row: any, updateData: any) => {
 const onEditSuccess = (data:Object)=>{
   baseListRef.value.reload()
   props.onEditSuccess?.(data)
-  xxDialogVisible.value = false
+  //xxDialogVisible.value = false
 }
 
 // 批量更新
@@ -435,12 +434,12 @@ const columns = ref({
     render: (scope: { row: any }) => {
       {%- if field.display_type == 'enum' %}
       return h(EnumLabel, {
-        field: '{{ module_name }}.{{ field.field|snake_to_camel }}Options',
+        field: '{{ module_name }}.{{ field.field|snake_to_camel(true) }}Options',
         value: scope.row.{{ field.field }}
       })
       {%- elif field.display_type == 'data-id' %}
       return h(EnumLabel, {
-        field: '{{ module_name }}.{{ module_name|snake_to_camel }}{{ field.data_id_props.options_name|snake_to_camel }}ModelOptions',
+        field: '{{ module_name }}.{{ module_name|snake_to_camel(true) }}{{ field.data_id_props.options_name|snake_to_camel(true) }}ModelOptions',
         value: scope.row.{{ field.field }}
       })
       {%- elif field.field == 'member_id' %}

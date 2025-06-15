@@ -1,12 +1,11 @@
 <!-- src/pages/{{ module_name }}.{{ table_name|replace('_', '-')|replace('lc-'+module_name+'-', '') }}/edit.vue -->
 <template>
     <enum-provider url="/common/options" :fields="[
-    'approvalStatusOptions',
   {%- for field in form_fields %}
   {%- if field.form_type == 'enum' %}
-    '{{ module_name }}.{{ field.field|snake_to_camel }}Options',
+    '{{ module_name }}.{{ field.field|snake_to_camel(true) }}Options',
   {%- elif field.form_type == 'data-id' %}
-    '{{ module_name }}.{{ module_name|snake_to_camel }}{{ field.props.field|snake_to_camel }}ModelOptions',
+    '{{ module_name }}.{{ module_name|snake_to_camel(true) }}{{ field.data_id_props.options_name|snake_to_camel(true) }}ModelOptions',
   {%- else %}
   {%- endif %}
   {%- endfor %}
@@ -97,12 +96,7 @@ const areaData = reactive({
 
 const formData = reactive({
 {%- for field in form_fields %}
-    {{ field.field }}: {% if field.form_type in ['enum', 'data-id'] %}0
-    {%- elif field.form_type == 'area-selector' %}{}
-    {%- elif field.form_type == 'select-file-multiple' or field.form_type == 'checkbox-group' %}[]
-    {%- elif field.form_type == 'switch' %}1
-    {%- elif field.base_type == 'number' %}0
-    {%- elif field.base_type == 'string' %}''
+    {{ field.field }}: {%- if field.default -%}{{ field.default }}
     {%- else %}null
     {%- endif %},
 {%- endfor %}
@@ -120,8 +114,8 @@ const formFields = [
           {%- if field.min is defined -%}min: {{ field.min }}, {%- endif -%}
         {%- endif -%}
         {%- if field.form_type == 'area-selector' -%}startLevel: 2, endLevel: 4, parentCode: '440000000000', {%- endif -%}
-        {%- if field.form_type == 'enum' -%}field: '{{ module_name }}.{{ field.field|snake_to_camel }}Options', allowEmpty: true, clearable: true, {%- endif -%}
-        {%- if field.form_type == 'data-id' -%}field: '{{ module_name }}.{{ module_name|snake_to_camel }}{{ field.props.field|snake_to_camel }}ModelOptions', allowEmpty: true, clearable: true, {%- endif -%}
+        {%- if field.form_type == 'enum' -%}field: '{{ module_name }}.{{ field.field|snake_to_camel(true) }}Options', {%- if field.required -%}allowEmpty: false, {%- endif -%} clearable: true, {%- endif -%}
+        {%- if field.form_type == 'data-id' -%}field: '{{ module_name }}.{{ module_name|snake_to_camel(true) }}{{ field.data_id_props.options_name|snake_to_camel(true) }}ModelOptions', {%- if field.required -%}allowEmpty: false, {%- endif -%} clearable: true, {%- endif -%}
         {%- if field.form_type == 'textarea' -%}rows: {{ field.rows|default(4) }}, maxlength: 500, showWordLimit: true, {%- endif -%}
         {%- if field.form_type == 'select-image' -%}
           type: '{{ field.props.type }}', {%- if field.props.multiple -%}multiple: true, limit: {{ field.props.limit|default(15) }}, {%- endif -%}

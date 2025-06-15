@@ -82,8 +82,10 @@ class VueEditGenerator(BaseGenerator):
                                 "field": field_name,
                                 "label": label,
                                 "required": "NO" in field["Null"],
+                                "default": field["Default"],
                                 "form_type": form_type,
                                 "base_type": base_type,
+                                "data_id_props" :self._get_data_id_field(field),
                                 "props": {
                                     "field": f"{option_name}",
                                     "class": "w-[320px]",
@@ -99,6 +101,7 @@ class VueEditGenerator(BaseGenerator):
                 "field": field_name,
                 "label": self.clean_comment(field["Comment"]) or field_name,
                 "required": "NO" in field["Null"],
+                "default": field["Default"],
                 "prop": snake_to_camel(field_name),
                 "form_type": form_type,
                 "base_type": base_type,
