@@ -35,7 +35,7 @@ if [[ -n $PS1 ]]; then
     alias la='eza --all --group-directories-first'
     alias rr='trash'
     alias rm='echo "Use rr (trash) instead of rm to avoid permanent deletion."; false'
-    alias cp='/opt/homebrew/bin/gcp -v'
+    #alias cp='/opt/homebrew/bin/gcp -v'
 
     curlj() {
         /usr/bin/curl "$@" | jq -C . 2>/dev/null || /usr/bin/curl "$@"
@@ -97,13 +97,21 @@ alias lnf='function _logwatch() { ssh root@lc.server.host "tail -F $1" | lnav; }
 function tanlog() {
     tail -f /Users/Chen/Coding/myscript/notification-server/main.log | awk '
 /^Details:/ {
+    sub(/^Details: /, "");
     printf "\033[31m%s\033[0m\n",$0;
     p=1;
     next
 }
-p&&/^trace_id:/{p=0}
+p&&/^occurred:/ {
+    printf "\033[36m%s\033[0m\n",$0;
+    p=0;
+    next
+}
 p {
-    printf "\033[36m%s\033[0m\n\n",$0
+    printf "\033[36m%s\033[0m\n",$0
+}
+END {
+    printf "\n"
 }'
 }
 
