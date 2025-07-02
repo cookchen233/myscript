@@ -1,0 +1,157 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <title>文本对比、比较 - huatools.com</title>
+    <meta charset="UTF-8">
+    <meta name="keywords" content="文本对比,文本比较,文本比对,差异对比">
+    <meta name="description" content="在线文本对比、文本比较、文本比对、文本差异对比工具。">
+    <meta name="renderer" content="webkit">
+    <link rel="icon" href="../img/favicon.ico"/>
+    <link rel="stylesheet" href="//lf6-cdn-tos.bytecdntp.com/cdn/expire-1-y/layui/2.5.5/css/layui.min.css"/>
+    <link rel="stylesheet" href="//lf9-cdn-tos.bytecdntp.com/cdn/expire-1-y/codemirror/5.50.0/codemirror.min.css">
+    <link rel="stylesheet" href="../codemirror/addon/merge/merge.min.css">
+    <link rel="stylesheet" href="../css/public.min.css"/>
+    <link rel="stylesheet" href="../css/tools.min.css"/>
+    <link rel="stylesheet" href="index.min.css"/>
+    <script src="//lf26-cdn-tos.bytecdntp.com/cdn/expire-1-y/layui/2.5.5/layui.js"></script>
+    <script src="//lf9-cdn-tos.bytecdntp.com/cdn/expire-1-y/jquery/3.6.0/jquery.min.js"></script>
+    <script src="//lf3-cdn-tos.bytecdntp.com/cdn/expire-1-y/diff_match_patch/20121119/diff_match_patch.js"></script>
+    <script src="//lf6-cdn-tos.bytecdntp.com/cdn/expire-1-y/codemirror/5.50.0/codemirror.min.js"></script>
+    <script src="//lf6-cdn-tos.bytecdntp.com/cdn/expire-1-y/codemirror/5.50.0/addon/display/placeholder.min.js"></script>
+    <script src="../codemirror/addon/merge/merge2.min.js"></script>
+    <script src="../codemirror/addon/search/search-all.min.js"></script>
+    <script src="//lf3-cdn-tos.bytecdntp.com/cdn/expire-1-y/clipboard.js/2.0.10/clipboard.min.js"></script>
+    <script src="//lf9-cdn-tos.bytecdntp.com/cdn/expire-1-y/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="../js/public.min.js"></script>
+    <script src="index.min.js"></script>
+</head>
+<body>
+<div class="body-div">
+    <div class="menu-div"></div>
+    <div class="main-div">
+        <div class="layui-container">
+            <div class="layui-row btns-row">
+                <div class="layui-col-left">
+                    <div class="layui-col-md6">
+                        <button type="button" class="layui-btn layui-btn-sm right-btn" id="clear" title="清空">
+                            <i class="gg-trash-empty"></i>
+                        </button>
+                        <button type="button" class="layui-btn layui-btn-sm right-btn" id="copy" title="复制">
+                            <i class="gg-copy"></i>
+                        </button>
+                        <button type="button" class="layui-btn layui-btn-sm right-btn" title="排序" id="sort">
+                            <i class="layui-icon layui-icon-up"></i>
+                        </button>
+                        <button type="button" class="layui-btn layui-btn-sm right-btn" id="save" title="保存">
+                            <i class="gg-download"></i>
+                        </button>
+                        <button type="button" class="layui-btn layui-btn-sm right-btn" id="history" title="恢复上次关闭或刷新页面时输入内容" disabled="disabled">
+                            <i class="gg-recover"></i>
+                        </button>
+                        <span id="diff-result"></span>
+                    </div>
+                    <div class="layui-col-md6">
+                        <button type="button" class="layui-btn layui-btn-sm right-btn" id="clear2" title="清空">
+                            <i class="gg-trash-empty"></i>
+                        </button>
+                        <button type="button" class="layui-btn layui-btn-sm right-btn" id="copy2" title="复制">
+                            <i class="gg-copy"></i>
+                        </button>
+                        <button type="button" class="layui-btn layui-btn-sm right-btn" title="排序" id="sort2">
+                            <i class="layui-icon layui-icon-up"></i>
+                        </button>
+                        <button type="button" class="layui-btn layui-btn-sm right-btn" id="save2" title="保存">
+                            <i class="gg-download"></i>
+                        </button>
+                        <button type="button" class="layui-btn layui-btn-sm right-btn" id="history2" title="恢复上次关闭或刷新页面时输入内容" disabled="disabled">
+                            <i class="gg-recover"></i>
+                        </button>
+                        <div class="other-btns">
+                            <a class="layui-a" href="/json-diff/">JSON对比</a>
+                            <button type="button" class="layui-btn layui-btn-sm right-btn" id="set" title="设置">
+                                <i class="layui-icon layui-icon-set"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="layui-row editor-row">
+                <div class="layui-col-left" id="view"></div>
+            </div>
+        </div>
+    </div>
+    <div class="set-div" style="display:none">
+        <div class="layui-tab layui-tab-card">
+            <ul class="layui-tab-title">
+                <li class="layui-this">功能</li>
+                <li>快捷键</li>
+                <li>帮助</li>
+            </ul>
+            <div class="layui-tab-content">
+                <div class="layui-tab-item layui-show">
+                    <div class="settings-form-item">
+                        <form class="layui-form">
+                            <div class="layui-form-item">
+                                <label class="layui-form-label">行内换行</label>
+                                <div class="layui-input-block">
+                                    <input type="checkbox" lay-skin="primary" lay-filter="line-wrap" id="line-wrap" title="开启" checked>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                <div class="layui-tab-item">
+                    <div class="layui-row first-row">
+                        <div class="layui-col-md12">光标激活编辑器时，</div>
+                    </div>
+                    <div class="layui-row">
+                        <div class="layui-col-md6">F11</div>
+                        <div class="layui-col-md6">大屏查看</div>
+                    </div>
+                    <div class="layui-row">
+                        <div class="layui-col-md6">Ctrl - F</div>
+                        <div class="layui-col-md6">查找</div>
+                    </div>
+                    <div class="layui-row">
+                        <div class="layui-col-md6">Ctrl - Enter</div>
+                        <div class="layui-col-md6">查找下一个</div>
+                    </div>
+                    <div class="layui-row">
+                        <div class="layui-col-md6">Ctrl - Shift - Enter</div>
+                        <div class="layui-col-md6">查找上一个</div>
+                    </div>
+                    <div class="layui-row">
+                        <div class="layui-col-md6">Ctrl - H</div>
+                        <div class="layui-col-md6">替换</div>
+                    </div>
+                    <div class="layui-row">
+                        <div class="layui-col-md6">Ctrl - Shift - H</div>
+                        <div class="layui-col-md6">替换全部</div>
+                    </div>
+                    <div class="layui-row">
+                        <div class="layui-col-md6">Ctrl - Home</div>
+                        <div class="layui-col-md6">跳至开头</div>
+                    </div>
+                    <div class="layui-row">
+                        <div class="layui-col-md6">Ctrl - End</div>
+                        <div class="layui-col-md6">跳至结尾</div>
+                    </div>
+                    <div class="layui-row">
+                        <div class="layui-col-md6">Ctrl - Z</div>
+                        <div class="layui-col-md6">撤销</div>
+                    </div>
+                    <div class="layui-row">
+                        <div class="layui-col-md6">Alt - G</div>
+                        <div class="layui-col-md6">跳至指定行</div>
+                    </div>
+                </div>
+                <div class="layui-tab-item">
+                    <div class="help">1、如文本内容在文件中，可直接拖入文件至输入框进行输入</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

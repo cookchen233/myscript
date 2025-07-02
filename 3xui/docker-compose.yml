@@ -1,0 +1,13 @@
+version: "3"
+services:
+  x-ui:
+    build: .
+    ports:
+      - "54321:54321"
+      - "2053:2053"
+      - "18688:18688"
+    container_name: 3xui
+    restart: always
+    privileged: true
+    volumes:
+      - ./x-ui-data:/etc/x-ui
