@@ -1,0 +1,16 @@
+package routes
+
+import (
+    "gin-app/handlers/api"
+    "github.com/gin-gonic/gin"
+)
+
+func register{{ Entity }}Routes(r *gin.RouterGroup) {
+    h := api.New{{ Entity }}Handler()
+    r.GET("{{ entity_snake }}/list", h.List)
+    r.GET("{{ entity_snake }}/read", h.Read)
+    r.GET("{{ entity_snake }}/lastByTask", h.LastByTask)
+    r.POST("{{ entity_snake }}/create", h.Create)
+    r.POST("{{ entity_snake }}/update", h.Update)
+    r.POST("{{ entity_snake }}/delete", h.Delete)
+}

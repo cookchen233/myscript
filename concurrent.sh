@@ -7,7 +7,8 @@ commands=(
   "yarn dev --port 5555"
   
   # "cd ~/Coding/bbv2-uniapp/ && pnpm run dev:h5 --port 4444"
-  "cd ~/Coding/cargo-uniapp/ && pnpm run dev:h5 --port 4444"
+  "cd ~/Coding/share-uniapp/ && pnpm run dev:h5 --port 4444"
+  # "cd ~/Coding/cargo-uniapp/ && pnpm run dev:h5 --port 4444"
   # "cd ~/Coding/driving-uniapp/ && pnpm run dev:h5 --port 4444"
   # "cd ~/Coding/safe-uniapp/ && pnpm run dev:h5 --port 4444"
   

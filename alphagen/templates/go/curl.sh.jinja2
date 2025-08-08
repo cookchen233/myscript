@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+
+# Example cURL commands for {{ entity_snake }} APIs
+
+TOKEN="<your-jwt-token>"
+BASE="http://localhost:8083/api/{{ entity_snake }}"
+
+# create
+curl -X POST "$BASE/create" \
+  -H "Content-Type: application/json" \
+  -H "token: $TOKEN" \
+  -d '{
+    "deployment_task_id":1,
+    "progress": 81,
+    "message": "任务执行中",
+    "details": "执行到第3步，等待用户确认"
+}'
+
+# read
+curl -X GET "$BASE/read?id=1" -H "token: $TOKEN"
+
+# list
+curl -X GET "$BASE/list" -H "token: $TOKEN"
+
+# update
+curl -X POST "$BASE/update" \
+  -H "Content-Type: application/json" \
+  -H "token: $TOKEN" \
+  -d '{
+    "id": 1,
+    "progress": 90,
+    "message": "任务更新",
+    "details": "xxx"
+}'
+
+# delete
+curl -X POST "$BASE/delete" -H "Content-Type: application/json" -H "token: $TOKEN" -d '{"id":1}'
+
+# last by task
+curl -X GET "$BASE/lastByTask?task_id=1" -H "token: $TOKEN"

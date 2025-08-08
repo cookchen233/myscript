@@ -1,0 +1,84 @@
+package api
+
+import (
+    "gin-app/ent/entgen"
+    "gin-app/handlers"
+    "gin-app/services"
+    "gin-app/structs/input"
+    "github.com/gin-gonic/gin"
+)
+
+type {{ Entity }}Handler struct {
+    handlers.Handler
+    Service *services.{{ Entity }}Service
+}
+
+func New{{ Entity }}Handler() *{{ Entity }}Handler { return &{{ Entity }}Handler{} }
+
+func (h *{{ Entity }}Handler) SetRequestContext(c *gin.Context, _ handlers.IHandler) {
+    h.C = c
+    h.Service = services.New{{ Entity }}Service(c)
+}
+
+func (h *{{ Entity }}Handler) List() {
+    var f input.Filter{{ Entity }}
+    if err := h.BindAndValidate(&f); err != nil {
+        h.Error(err)
+        return
+    }
+    total, err := h.Service.GetTotal(f)
+    if err != nil {
+        h.Error(err)
+        return
+    }
+    if total == 0 {
+        h.Success(nil)
+        return
+    }
+    list, err := h.Service.GetList(f)
+    if err != nil {
+        h.Error(err)
+        return
+    }
+    h.Success(handlers.PageResult{Total: total, List: list})
+}
+
+func (h *{{ Entity }}Handler) Read() {
+    var req struct{ ID int `json:"id" validate:"required"` }
+    if err := h.BindAndValidate(&req); err != nil { h.Error(err); return }
+    item, err := h.Service.Read(req.ID)
+    if err != nil { h.Error(err); return }
+    h.Success(item)
+}
+
+func (h *{{ Entity }}Handler) Create() {
+    var item entgen.{{ Entity }}
+    if err := h.BindAndValidate(&item); err != nil { h.Error(err); return }
+    res, err := h.Service.Create(&item)
+    if err != nil { h.Error(err); return }
+    h.Success(res)
+}
+
+func (h *{{ Entity }}Handler) Update() {
+    var item entgen.{{ Entity }}
+    if err := h.BindAndValidate(&item); err != nil { h.Error(err); return }
+    res, err := h.Service.Update(&item)
+    if err != nil { h.Error(err); return }
+    h.Success(res)
+}
+
+func (h *{{ Entity }}Handler) Delete() {
+    var req struct{ ID int `json:"id" validate:"required"` }
+    if err := h.BindAndValidate(&req); err != nil { h.Error(err); return }
+    err := h.Service.Delete(req.ID)
+    if err != nil { h.Error(err); return }
+    h.Success(nil)
+}
+
+func (h *{{ Entity }}Handler) LastByTask() {
+    var f input.Filter{{ Entity }}
+    if err := h.BindAndValidate(&f); err != nil { h.Error(err); return }
+    item, err := h.Service.GetByTaskID(f.TaskID)
+    if err != nil { h.Error(err); return }
+    h.Success(item)
+}

@@ -1,0 +1,143 @@
+package services
+
+import (
+    "context"
+    "gin-app/ent/entgen"
+    "gin-app/ent/entgen/{{ entity_pkg }}"
+    "gin-app/response"
+    "gin-app/structs/input"
+    "gin-app/utils"
+    "gin-app/utils/db"
+    "reflect"
+    "time"
+)
+
+type {{ Entity }}Service struct {
+    *CRUDService[entgen.{{ Entity }}, input.Filter{{ Entity }}]
+    entClient *entgen.{{ Entity }}Client
+}
+
+func New{{ Entity }}Service(ctx context.Context) *{{ Entity }}Service {
+    entClient := db.EntClient.{{ Entity }}
+
+    svc := &{{ Entity }}Service{
+        entClient: entClient,
+    }
+
+    crud := NewCRUDService[entgen.{{ Entity }}, input.Filter{{ Entity }}](ctx, entClient, svc)
+    svc.CRUDService = crud
+
+    return svc
+}
+
+// BaseQuery 返回 *{{ Entity }}Query，自动带软删除等默认条件
+func (s *{{ Entity }}Service) BaseQuery() *entgen.{{ Entity }}Query {
+    qVal := s.CRUDService.BaseQuery()
+    if !qVal.IsValid() {
+        return s.entClient.Query()
+    }
+    if q, ok := qVal.Interface().(*entgen.{{ Entity }}Query); ok {
+        return q
+    }
+    return s.entClient.Query()
+}
+
+// BuildQuery 实现 QueryBuilder 接口, 用于 List,Total
+func (s *{{ Entity }}Service) BuildQuery(filter input.Filter{{ Entity }}) reflect.Value {
+    query := s.entClient.Query().Where({{ entity_pkg }}.DeleteTimeIsNil())
+
+    if filter.ID != 0 {
+        query = query.Where({{ entity_pkg }}.IDEQ(filter.ID))
+    }
+    if filter.UserID != 0 {
+        query = query.Where({{ entity_pkg }}.UserIDEQ(filter.UserID))
+    }
+
+    return reflect.ValueOf(query)
+}
+
+func (s *{{ Entity }}Service) BuildDeletedQuery(filter input.Filter{{ Entity }}) reflect.Value {
+    query := s.entClient.Query().Where({{ entity_pkg }}.DeleteTimeNotNil())
+
+    if filter.ID != 0 {
+        query = query.Where({{ entity_pkg }}.IDEQ(filter.ID))
+    }
+    if filter.UserID != 0 {
+        query = query.Where({{ entity_pkg }}.UserIDEQ(filter.UserID))
+    }
+
+    return reflect.ValueOf(query)
+}
+
+// AddDefaultOrder 排序, 可选, 用于 List
+func (s *{{ Entity }}Service) AddDefaultOrder(query reflect.Value) reflect.Value {
+    orderMethod := query.MethodByName("Order")
+    if orderMethod.IsValid() {
+        desc := reflect.ValueOf(entgen.Desc({{ entity_pkg }}.FieldID))
+        return orderMethod.Call([]reflect.Value{desc})[0]
+    }
+    return query
+}
+
+// CleanupSoftDeleted 清理软删除的记录（真正删除）
+func (s *{{ Entity }}Service) CleanupSoftDeleted(beforeDays int) error {
+    cutoffTime := time.Now().AddDate(0, 0, -beforeDays)
+
+    _, err := s.entClient.Delete().
+        Where({{ entity_pkg }}.DeleteTimeLT(cutoffTime)).
+        Exec(s.Ctx)
+
+    return err
+}
+
+//==============================================业务方法区==========================================================
+
+// GetByTaskID 根据 deployment_task_id 获取最新的一条
+func (s *{{ Entity }}Service) GetByTaskID(taskID int) (*entgen.{{ Entity }}, error) {
+    first, err := s.BaseQuery().
+        Where({{ entity_pkg }}.DeploymentTaskIDEQ(taskID)).
+        Order(entgen.Desc({{ entity_pkg }}.FieldID)).
+        First(s.Ctx)
+    if err != nil {
+        if entgen.IsNotFound(err) {
+            return nil, response.NewDataNotFound()
+        }
+        return nil, utils.ErrorWrap(err, "获取失败")
+    }
+    return first, nil
+}
+
+
+import (
+    "context"
+    "gin-app/ent/entgen"
+    "gin-app/ent/entgen/{{ entity_snake }}"
+    "gin-app/structs/input"
+    "gin-app/utils"
+)
+
+type {{ Entity }}Service struct {
+    *CRUDService[entgen.{{ Entity }}, input.Filter{{ Entity }}]
+}
+
+func New{{ Entity }}Service(ctx context.Context) *{{ Entity }}Service {
+    svc := &{{ Entity }}Service{
+        CRUDService: NewCRUDService[entgen.{{ Entity }}, input.Filter{{ Entity }}](ctx),
+    }
+    return svc
+}
+
+// GetByTaskID example
+func (s *{{ Entity }}Service) GetByTaskID(taskID int) (*entgen.{{ Entity }}, error) {
+    item, err := s.BaseQuery().
+        Where({{ entity_snake }}.DeploymentTaskIDEQ(taskID)).
+        Order(entgen.Desc({{ entity_snake }}.FieldID)).
+        First(s.Ctx)
+    if err != nil {
+        if entgen.IsNotFound(err) {
+            return nil, utils.ErrorWithStack(err)
+        }
+        return nil, utils.ErrorWrap(err, "获取失败")
+    }
+    return item, nil
+}
