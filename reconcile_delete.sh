@@ -47,12 +47,17 @@ for a in "${@:-}"; do
   esac
 done
 
+# 确保变量初始化
+: "${DEBUG:=false}" "${DRY_RUN:=false}" "${KEEP_TMP:=false}"
+
 # 日志
 log() { echo "[INFO] $*" >&2; }
-dbg() { [[ $DEBUG == true ]] && echo "[DEBUG] $*" >&2; }
+dbg() { [ "${DEBUG:-false}" = true ] && echo "[DEBUG] $*" >&2; }
 err() { echo "[ERROR] $*" >&2; }
 
-# 失败时打印最后的系统错误
+# 清理旧的 trap
+trap '' EXIT ERR
+# 设置新的错误处理 trap
 trap 'err "脚本异常退出（行号:$LINENO，上一条命令: $BASH_COMMAND）"' ERR
 
 # 检查依赖工具
@@ -65,8 +70,11 @@ WORKDIR="$(mktemp -d /tmp/es_reconcile.XXXXXX)"
 MYSQL_IDS="$WORKDIR/mysql_ids.txt"
 ES_IDS="$WORKDIR/es_ids.txt"
 TO_DELETE="$WORKDIR/to_delete.txt"
-[[ $KEEP_TMP == true ]] || cleanup() { rm -rf "$WORKDIR" || true; [[ -n "${last_scroll_id:-}" ]] && curl -s "${auth_args[@]}" -XDELETE "${ES_BASE}/_search/scroll" -d "{\"scroll_id\":\"$last_scroll_id\"}" >/dev/null || true; }
-trap '[[ $KEEP_TMP == true ]] || cleanup' EXIT
+cleanup() {
+  rm -rf "$WORKDIR" || true
+  [[ -n "${last_scroll_id:-}" ]] && curl -s "${auth_args[@]}" -XDELETE "${ES_BASE}/_search/scroll" -H 'Content-Type: application/json' -d "{\"scroll_id\":\"$last_scroll_id\"}" >/dev/null || true
+}
+[[ $KEEP_TMP == true ]] || trap 'cleanup' EXIT
 
 log "工作目录: $WORKDIR"
 
